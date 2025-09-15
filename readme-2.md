@@ -99,14 +99,12 @@ Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 ### Шаг 3: Выберите режим и запустите сервер
 
 #### Режим 1: STDIO (локальное использование)
-Идеально для интеграции с локальными IDE.
 ```powershell
 # Тестовый запуск
 echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}' | pwsh .\mcp-powershell-stdio.ps1
 ```
 
 #### Режим 2: HTTP(S) (сетевое использование)
-Идеально для создания постоянно работающего сервиса.
 ```powershell
 # Запуск HTTP сервера
 pwsh -File .\mcp-powershell-http.ps1 -Port 8091 -AuthToken "supersecrettoken"
@@ -214,6 +212,8 @@ $env:MCP_MAX_LOG_SIZE = "50"
 | `initialize` | Инициализация сервера MCP | `{}` |
 | `tools/call` | Выполнение PowerShell скрипта | `{ name, arguments }` |
 | `tools/list` | Получение списка инструментов | `{}` |
+| `tools/status` | Получение статуса сервера | `{}` |
+| `tools/logs` | Получение последних логов | `{ count }` |
 
 ---
 
@@ -339,6 +339,27 @@ Get-Content $logPath -Tail 20
 
 # Отслеживать логи в реальном времени
 Get-Content $logPath -Wait
+```
+
+### Сбор метрик
+
+```powershell
+function Get-MCPMetrics {
+    $logPath = $env:MCP_LOG_PATH -or (Join-Path $env:TEMP "mcp-powershell-server.log")
+    if (-not (Test-Path $logPath)) { Write-Warning "Log file not found."; return }
+    
+    $logContent = Get-Content $logPath
+    $todayLogs = $logContent | Where-Object { $_.StartsWith((Get-Date).ToString("yyyy-MM-dd")) }
+    
+    return @{
+        TotalRequests = ($todayLogs | Where-Object { $_ -match "Обработка MCP" }).Count
+        Errors = ($todayLogs | Where-Object { $_ -match "\[ERROR\]" }).Count
+        Warnings = ($todayLogs | Where-Object { $_ -match "\[WARNING\]" }).Count
+        SuccessfulExecutions = ($todayLogs | Where-Object { $_ -match "успешно" }).Count
+    }
+}
+
+Get-MCPMetrics | Format-Table -AutoSize
 ```
 
 ---
