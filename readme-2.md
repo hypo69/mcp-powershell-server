@@ -100,14 +100,12 @@ Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 ### Шаг 3: Выберите режим и запустите сервер
 
 #### Режим 1: STDIO (локальное использование)
-Идеально для интеграции с локальными IDE.
 ```powershell
 # Тестовый запуск
 echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}' | pwsh .\mcp-powershell-stdio.ps1
 ```
 
 #### Режим 2: HTTP(S) (сетевое использование)
-Идеально для создания постоянно работающего сервиса.
 ```powershell
 # Запуск HTTP сервера
 pwsh -File .\mcp-powershell-http.ps1 -Port 8091 -AuthToken "supersecrettoken"
@@ -122,7 +120,7 @@ pwsh -File .\mcp-powershell-http.ps1 -Port 8091 -AuthToken "supersecrettoken"
 
 ### Переменные окружения
 
-Вы можете управлять поведением сервера, установив следующие переменные окружения перед запуском скрипта.
+Вы можете управлять поведением сервера, установив следующие переменные окружения перед запуском.
 
 ```powershell
 # Путь для лог-файла (по умолчанию: %TEMP%\mcp-powershell-server.log)
@@ -171,62 +169,9 @@ $env:MCP_MAX_LOG_SIZE = "50"
     Set-Service -Name MCP-PowerShell-Server -StartupType Automatic
     ```
 
-### Linux (systemd)
+### Linux (systemd) и macOS (launchd)
 
-1.  **Создайте файл службы**: `sudo nano /etc/systemd/system/mcp-server.service`
-2.  **Вставьте конфигурацию**:
-    ```ini
-    [Unit]
-    Description=MCP PowerShell HTTP Server
-    After=network.target
-
-    [Service]
-    ExecStart=/usr/bin/pwsh -NoProfile -File /opt/mcp-server/mcp-powershell-http.ps1 -Port 8443 -AuthToken "MySecretToken"
-    WorkingDirectory=/opt/mcp-server
-    User=www-data
-    Restart=always
-
-    [Install]
-    WantedBy=multi-user.target
-    ```
-3.  **Включите и запустите**:
-    ```bash
-    sudo systemctl daemon-reload
-    sudo systemctl enable --now mcp-server.service
-    sudo systemctl status mcp-server.service
-    ```
-
-### macOS (launchd)
-
-1.  **Создайте файл конфигурации**: `sudo nano /Library/LaunchDaemons/com.example.mcpserver.plist`
-2.  **Вставьте конфигурацию**:
-    ```xml
-    <?xml version="1.0" encoding="UTF-8"?>
-    <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-    <plist version="1.0">
-    <dict>
-        <key>Label</key>
-        <string>com.example.mcpserver</string>
-        <key>ProgramArguments</key>
-        <array>
-            <string>/usr/local/bin/pwsh</string>
-            <string>-NoProfile</string>
-            <string>-File</string>
-            <string>/opt/mcp-server/mcp-powershell-http.ps1</string>
-            <string>-Port</string>
-            <string>8443</string>
-            <string>-AuthToken</string>
-            <string>MySecretToken</string>
-        </array>
-        <key>RunAtLoad</key><true/>
-        <key>KeepAlive</key><true/>
-    </dict>
-    </plist>
-    ```
-3.  **Загрузите службу**:
-    ```bash
-    sudo launchctl load /Library/LaunchDaemons/com.example.mcpserver.plist
-    ```
+Инструкции по настройке служб для Linux и macOS доступны в [полной документации](docs/SERVICE_SETUP.md).
 
 ---
 
@@ -246,7 +191,7 @@ $env:MCP_MAX_LOG_SIZE = "50"
 }
 ```
 
-#### VS Code (с расширением Cline)
+#### VS Code
 
 ```json
 {
@@ -268,95 +213,115 @@ $env:MCP_MAX_LOG_SIZE = "50"
 | `initialize` | Инициализация сервера MCP | `{}` |
 | `tools/call` | Выполнение PowerShell скрипта | `{ name, arguments }` |
 | `tools/list` | Получение списка инструментов | `{}` |
-| `tools/status` | Получение статуса сервера | `{}` |
-| `tools/logs` | Получение последних логов | `{ count }` |
 
 ---
 
 ## 🛠️ Примеры использования
 
-### Примеры для режима STDIO (MCP протокол)
+### Примеры для режима STDIO
 
+#### Пример 1: Тестовый запрос (Get-Date)
 ```powershell
-# 1️⃣ Инициализация соединения
-@'
-{
-  "jsonrpc": "2.0", "id": 1, "method": "initialize",
-  "params": { "protocolVersion": "2024-11-05" }
-}
-'@ | pwsh .\mcp-powershell-stdio.ps1
-
-# 2️⃣ Выполнение скрипта с параметрами
-$script = "param($ProcName) Get-Process -Name $ProcName"
 $request = @{
-    jsonrpc = "2.0"; id = 2; method = "tools/call"
-    params = @{
-        name = "run-script"
-        arguments = @{
-            script = $script
-            parameters = @{ ProcName = "pwsh" }
-        }
-    }
+    jsonrpc = "2.0"; id = 1; method = "tools/call"
+    params = @{ name = "run-script"; arguments = @{ script = "Get-Date"; timeoutSeconds = 10 } }
 } | ConvertTo-Json -Depth 5
 
 $request | pwsh .\mcp-powershell-stdio.ps1
 ```
 
-### Примеры клиентов на разных языках (HTTP/S)
+#### Пример 2: Системная информация
+```powershell
+$request = @{
+    jsonrpc = "2.0"; id = 2; method = "tools/call"
+    params = @{ name = "run-script"; arguments = @{ script = "Get-ComputerInfo | Select OsName, OsVersion, CsTotalPhysicalMemory" } }
+} | ConvertTo-Json -Depth 5
 
-#### 🟢 Node.js клиент
-
-```javascript
-import fetch from "node-fetch";
-import https from "https";
-
-// Агент для отключения проверки самоподписанных сертификатов
-const httpsAgent = new https.Agent({ rejectUnauthorized: false });
-const url = "https://localhost:8443/execute";
-const headers = {
-  "Authorization": "Bearer MySecretToken",
-  "Content-Type": "application/json"
-};
-const payload = {
-  command: "Get-Service | Where-Object Status -eq 'Running' | Select-Object -First 5 | ConvertTo-Json"
-};
-
-(async () => {
-  try {
-    const response = await fetch(url, {
-      method: "POST", headers, body: JSON.stringify(payload), agent: httpsAgent
-    });
-    console.log(await response.json());
-  } catch (err) { console.error(err); }
-})();
+$request | pwsh .\mcp-powershell-stdio.ps1
 ```
 
-#### 🐍 Python клиент
+#### Пример 3: Работа с файлами
+```powershell
+$script = "Get-ChildItem -Path $env:USERPROFILE -File | Sort LastWriteTime -Desc | Select -First 10 Name, Length"
+$request = @{
+    jsonrpc = "2.0"; id = 3; method = "tools/call"
+    params = @{ name = "run-script"; arguments = @{ script = $script; timeoutSeconds = 60 } }
+} | ConvertTo-Json -Depth 5
 
-```python
-import requests
-import json
-import urllib3
-
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-url = "https://localhost:8443/execute"
-headers = {"Authorization": "Bearer MySecretToken", "Content-Type": "application/json"}
-payload = {"command": "Get-Process | Sort-Object CPU -Desc | Select -First 3 Name, CPU | ConvertTo-Json"}
-
-response = requests.post(url, headers=headers, data=json.dumps(payload), verify=False)
-print(response.json())
+$request | pwsh .\mcp-powershell-stdio.ps1
 ```
 
-#### 🔹 PowerShell клиент (`Invoke-RestMethod`)
+#### Пример 4: Скрипт с параметрами
+```powershell
+$script = "param($ProcessName, $Top = 5) Get-Process $ProcessName | Sort CPU -Desc | Select -First $Top Name, CPU"
+$request = @{
+    jsonrpc = "2.0"; id = 4; method = "tools/call"
+    params = @{
+        name = "run-script"
+        arguments = @{ script = $script; parameters = @{ ProcessName = "pwsh"; Top = 3 } }
+    }
+} | ConvertTo-Json -Depth 5
 
+$request | pwsh .\mcp-powershell-stdio.ps1```
+
+### Примеры для режима HTTP(S)
+
+Ниже приведены аналогичные примеры для вызова HTTP(S) сервера.
+
+#### PowerShell (`Invoke-RestMethod`)
 ```powershell
 $Url = "https://localhost:8443/execute"
 $Token = "MySecretToken"
 $Headers = @{ "Authorization" = "Bearer $Token"; "Content-Type"  = "application/json" }
-$Payload = @{ command = "Get-Process pwsh | ConvertTo-Json" } | ConvertTo-Json
 
-$Response = Invoke-RestMethod -Uri $Url -Method Post -Headers $Headers -Body $Payload -SkipCertificateCheck
-$Response | ConvertTo-Json -Depth 5
+# Пример 1: Системная информация
+$body1 = @{ command = "Get-ComputerInfo | Select OsName, OsVersion" } | ConvertTo-Json
+Invoke-RestMethod -Uri $Url -Method Post -Headers $Headers -Body $body1 -SkipCertificateCheck
+
+# Пример 2: Скрипт с параметрами
+$body2 = @{
+    command = "param($SvcStatus) Get-Service | Where Status -eq $SvcStatus | Select -First 5"
+    parameters = @{ SvcStatus = "Running" }
+} | ConvertTo-Json
+Invoke-RestMethod -Uri $Url -Method Post -Headers $Headers -Body $body2 -SkipCertificateCheck
+```
+
+#### cURL
+```bash
+curl --insecure -X POST "https://localhost:8443/execute" \
+  -H "Authorization: Bearer MySecretToken" \
+  -H "Content-Type: application/json" \
+  -d '{"command": "Get-Process | Sort-Object CPU -Descending | Select-Object -First 3 Name, CPU | ConvertTo-Json"}'
+```
+
+### Примеры клиентов на других языках (HTTP/S)
+
+#### 🟢 Node.js клиент```javascript
+import fetch from "node-fetch";
+import https from "https-proxy-agent";
+
+const agent = new https.Agent({ rejectUnauthorized: false });
+const url = "https://localhost:8443/execute";
+const headers = { "Authorization": "Bearer MySecretToken", "Content-Type": "application/json" };
+const payload = { command: "Get-Service -Name Spooler | ConvertTo-Json" };
+
+fetch(url, { method: "POST", headers, body: JSON.stringify(payload), agent })
+  .then(res => res.json())
+  .then(json => console.log(json))
+  .catch(err => console.error(err));
+```
+
+#### 🐍 Python клиент
+```python
+import requests, json, urllib3
+
+urllib3.disable_warnings()
+url = "https://localhost:8443/execute"
+headers = {"Authorization": "Bearer MySecretToken", "Content-Type": "application/json"}
+payload = {"command": "Get-Process pwsh | Select Name, CPU | ConvertTo-Json"}
+
+response = requests.post(url, headers=headers, data=json.dumps(payload), verify=False)
+print(response.json())
 ```
 
 ---
@@ -382,30 +347,6 @@ Get-Content $logPath -Tail 20
 # Отслеживать логи в реальном времени
 Get-Content $logPath -Wait
 ```
-
-### Сбор метрик
-
-```powershell
-function Get-MCPMetrics {
-    $logPath = $env:MCP_LOG_PATH -or (Join-Path $env:TEMP "mcp-powershell-server.log")
-    if (-not (Test-Path $logPath)) { return }
-    $logContent = Get-Content $logPath
-    $todayLogs = $logContent | Where-Object { $_ -match (Get-Date -Format "yyyy-MM-dd") }
-    return @{
-        TotalRequests = ($todayLogs | Where-Object { $_ -match "Обработка MCP" }).Count
-        Errors = ($todayLogs | Where-Object { $_ -match "\[ERROR\]" }).Count
-    }
-}
-Get-MCPMetrics
-```
-
----
-
-## 📚 Дополнительные ресурсы
-
-*   [Официальный сайт Model Context Protocol](https://modelcontextprotocol.io/)
-*   [Спецификация MCP](https://spec.modelcontextprotocol.io/)
-*   [Документация PowerShell](https://docs.microsoft.com/powershell/)
 
 ---
 
