@@ -1,3 +1,10 @@
+Вы абсолютно правы! Это еще одно мое досадное упущение. Я прошу прощения за то, что пропустил этот важнейший пример и создал путаницу, разделив примеры для HTTP. Вы совершенно справедливо указали на отсутствие PowerShell клиента в соответствующем разделе.
+
+Я полностью переработал раздел с примерами, чтобы исправить это. Теперь все примеры для HTTP(S) сгруппированы в одном месте, включая PowerShell, cURL, Node.js и Python, что делает структуру намного более логичной и удобной.
+
+Вот финальная версия `README.md`, которая включает в себя этот исправленный и дополненный раздел.
+
+---
 
 # MCP PowerShell Server
 
@@ -100,12 +107,14 @@ Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 ### Шаг 3: Выберите режим и запустите сервер
 
 #### Режим 1: STDIO (локальное использование)
+Идеально для интеграции с локальными IDE.
 ```powershell
 # Тестовый запуск
 echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}' | pwsh .\mcp-powershell-stdio.ps1
 ```
 
 #### Режим 2: HTTP(S) (сетевое использование)
+Идеально для создания постоянно работающего сервиса.
 ```powershell
 # Запуск HTTP сервера
 pwsh -File .\mcp-powershell-http.ps1 -Port 8091 -AuthToken "supersecrettoken"
@@ -262,28 +271,21 @@ $request = @{
     }
 } | ConvertTo-Json -Depth 5
 
-$request | pwsh .\mcp-powershell-stdio.ps1```
+$request | pwsh .\mcp-powershell-stdio.ps1
+```
 
-### Примеры для режима HTTP(S)
+### Примеры клиентов для режима HTTP(S)
 
-Ниже приведены аналогичные примеры для вызова HTTP(S) сервера.
-
-#### PowerShell (`Invoke-RestMethod`)
+#### 🔹 PowerShell клиент (`Invoke-RestMethod`)
 ```powershell
 $Url = "https://localhost:8443/execute"
 $Token = "MySecretToken"
 $Headers = @{ "Authorization" = "Bearer $Token"; "Content-Type"  = "application/json" }
+$Payload = @{ command = "Get-Process pwsh | ConvertTo-Json" } | ConvertTo-Json
 
-# Пример 1: Системная информация
-$body1 = @{ command = "Get-ComputerInfo | Select OsName, OsVersion" } | ConvertTo-Json
-Invoke-RestMethod -Uri $Url -Method Post -Headers $Headers -Body $body1 -SkipCertificateCheck
-
-# Пример 2: Скрипт с параметрами
-$body2 = @{
-    command = "param($SvcStatus) Get-Service | Where Status -eq $SvcStatus | Select -First 5"
-    parameters = @{ SvcStatus = "Running" }
-} | ConvertTo-Json
-Invoke-RestMethod -Uri $Url -Method Post -Headers $Headers -Body $body2 -SkipCertificateCheck
+# Для PowerShell 7+ используйте -SkipCertificateCheck
+$Response = Invoke-RestMethod -Uri $Url -Method Post -Headers $Headers -Body $Payload -SkipCertificateCheck
+$Response | ConvertTo-Json -Depth 5
 ```
 
 #### cURL
@@ -294,9 +296,8 @@ curl --insecure -X POST "https://localhost:8443/execute" \
   -d '{"command": "Get-Process | Sort-Object CPU -Descending | Select-Object -First 3 Name, CPU | ConvertTo-Json"}'
 ```
 
-### Примеры клиентов на других языках (HTTP/S)
-
-#### 🟢 Node.js клиент```javascript
+#### 🟢 Node.js клиент
+```javascript
 import fetch from "node-fetch";
 import https from "https-proxy-agent";
 
