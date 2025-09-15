@@ -85,6 +85,13 @@ powershell.exe -File .\mcp-powershell-https.ps1 `
 
 ---
 
+
+Установка как системный сервис (опционально)
+
+```powershell
+New-Service -Name "MCP-PowerShell" -BinaryPathName "powershell.exe -File C:\Path\To\mcp-powershell-stdio.ps1" -DisplayName "MCP PowerShell Server"
+```
+
 ## 🔧 Конфигурация логирования
 
 ```powershell

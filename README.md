@@ -118,7 +118,7 @@ $env:MCP_MAX_LOG_SIZE = "50" # МБ
 }
 ```
 
-#### Cline (VS Code Extension)
+#### VS Code
 
 ```json
 {
@@ -136,6 +136,37 @@ $env:MCP_MAX_LOG_SIZE = "50" # МБ
 ## 🛠️ Примеры использования
 
 ### STDIO
+
+
+Инициализация соединения (JSON-RPC)
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "initialize",
+  "params": {
+    "protocolVersion": "2024-11-05",
+    "capabilities": {},
+    "clientInfo": {
+      "name": "my-client",
+      "version": "1.0.0"
+    }
+  }
+}
+Выполнение скрипта
+{
+  "jsonrpc": "2.0",
+  "id": 2,
+  "method": "tools/call",
+  "params": {
+    "name": "run-script",
+    "arguments": {
+      "script": "Get-Date",
+      "timeoutSeconds": 10
+    }
+  }
+}
+
+
 
 ```powershell
 # 1️⃣ Тестовый запрос
