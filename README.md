@@ -27,7 +27,7 @@ MCP PowerShell Server — это реализация сервера Model Conte
 ### Системные требования
 
 * **Windows** 10/11 или Windows Server 2016+
-* **PowerShell** 5.1 или выше (включая PowerShell 7.x)
+* **PowerShell** 7.x
 * **Права администратора** (опционально, для выполнения системных команд)
 
 ### MCP Client
