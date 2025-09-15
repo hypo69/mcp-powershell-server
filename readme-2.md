@@ -1,3 +1,4 @@
+
 # MCP PowerShell Server
 
 [![PowerShell](https://img.shields.io/badge/PowerShell-7%2B-blue.svg)](https://github.com/PowerShell/PowerShell)
@@ -113,6 +114,25 @@ pwsh -File .\mcp-powershell-http.ps1 -Port 8091 -AuthToken "supersecrettoken"
 
 # Запуск HTTPS сервера (требуется отпечаток сертификата)
 # pwsh -File .\mcp-powershell-http.ps1 -Port 8443 -AuthToken "supersecrettoken" -CertThumbprint "A1B2C3D4..."
+```
+
+---
+
+## 🔧 Конфигурация
+
+### Переменные окружения
+
+Вы можете управлять поведением сервера, установив следующие переменные окружения перед запуском скрипта.
+
+```powershell
+# Путь для лог-файла (по умолчанию: %TEMP%\mcp-powershell-server.log)
+$env:MCP_LOG_PATH = "C:\Logs\mcp-powershell.log"
+
+# Уровень логирования (DEBUG, INFO, WARNING, ERROR)
+$env:MCP_LOG_LEVEL = "INFO"
+
+# Максимальный размер лога в МБ (по умолчанию: 10)
+$env:MCP_MAX_LOG_SIZE = "50"
 ```
 
 ### 🔐 Настройка HTTPS: Как получить отпечаток сертификата (Thumbprint) в Windows
@@ -308,7 +328,8 @@ const payload = {
     });
     console.log(await response.json());
   } catch (err) { console.error(err); }
-})();```
+})();
+```
 
 #### 🐍 Python клиент
 
