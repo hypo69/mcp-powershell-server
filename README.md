@@ -1,24 +1,54 @@
-
 # MCP PowerShell Server
 
-[![PowerShell](https://img.shields.io/badge/PowerShell-5.1%2B-blue.svg)](https://github.com/PowerShell/PowerShell)
+[![PowerShell](https://img.shields.io/badge/PowerShell-7%2B-blue.svg)](https://github.com/PowerShell/PowerShell)
 [![MCP Protocol](https://img.shields.io/badge/MCP-2024--11--05-green.svg)](https://modelcontextprotocol.io/)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-MCP PowerShell Server — это реализация сервера Model Context Protocol (MCP) для безопасного выполнения PowerShell скриптов. Сервер предоставляет стандартизированный интерфейс для выполнения PowerShell команд через MCP протокол с поддержкой изоляции процессов, таймаутов и детального логирования.
+**MCP PowerShell Server** — это реализация сервера Model Context Protocol (MCP) для безопасного выполнения PowerShell скриптов. Сервер предоставляет стандартизированный интерфейс для выполнения PowerShell команд через MCP протокол с поддержкой изоляции процессов, таймаутов и детального логирования.
 
 ---
 
 ## 🚀 Возможности
 
-* ✅ **MCP Protocol 2024-11-05** — Полная совместимость с последней версией протокола
-* 🔒 **Безопасное выполнение** — Изоляция через отдельные PowerShell процессы
-* ⏱️ **Контроль времени выполнения** — Настраиваемые таймауты (1–3600 секунд)
-* 📁 **Гибкая рабочая среда** — Возможность указания рабочей директории
-* 📊 **Детальное логирование** — Полная трассировка выполнения с разными уровнями
-* 🔄 **STDIO интерфейс** — Работа через стандартные потоки ввода/вывода
-* 🌐 **UTF-8 поддержка** — Корректная обработка Unicode символов
-* ⚡ **Высокая производительность** — Минимальные накладные расходы
+*   ✅ **MCP Protocol 2024-11-05** — Полная совместимость с последней версией протокола.
+*   🔒 **Безопасное выполнение** — Изоляция каждого скрипта через отдельные PowerShell процессы.
+*   ⏱️ **Контроль времени выполнения** — Настраиваемые таймауты (1–3600 секунд).
+*   📁 **Гибкая рабочая среда** — Возможность указания рабочей директории.
+*   📊 **Детальное логирование** — Полная трассировка выполнения с разными уровнями.
+*   🔄 **Два режима работы** — Поддержка **STDIO** для локальной интеграции и **HTTP(S)** для сетевого доступа.
+*   🌐 **UTF-8 поддержка** — Корректная обработка Unicode символов.
+*   ⚡ **Высокая производительность** — Минимальные накладные расходы.
+
+---
+
+## 🔄 Схема работы MCP PowerShell Server
+
+```
+           +-------------------+
+           | MCP Клиент        |
+           | (например IDE)    |
+           +---------+---------+
+                     |
+           JSON-RPC через STDIO/HTTP(S)
+                     |
+           +---------v---------+
+           | MCP Server        |
+           | PowerShell Bridge |
+           +---------+---------+
+                     |
+             Запуск скрипта
+                     |
+           +---------v---------+
+           | PowerShell Engine |
+           | (отдельный proc)  |
+           +---------+---------+
+                     |
+                Результат/Логи
+                     |
+           +---------v---------+
+           | MCP Клиент        |
+           +-------------------+
+```
 
 ---
 
@@ -26,68 +56,61 @@ MCP PowerShell Server — это реализация сервера Model Conte
 
 ### Системные требования
 
-* **Windows** 10/11 или Windows Server 2016+
-* **PowerShell** 7.x
-* **Права администратора** (опционально, для выполнения системных команд)
+*   **Windows, Linux или macOS** с установленным PowerShell 7+.
+*   **Права администратора/root** (для установки службы и выполнения системных команд).
 
 ### MCP Client
 
-Любой MCP-совместимый клиент, поддерживающий:
-
-* MCP Protocol версии 2024-11-05
-* STDIO или HTTP(S) транспорт
-* JSON-RPC 2.0
+*   Любой MCP-совместимый клиент, поддерживающий STDIO или HTTP(S) транспорт и JSON-RPC 2.0.
 
 ---
 
-## 📦 Установка
+## 📦 Установка и запуск
 
-### Быстрая установка (STDIO)
+### Шаг 1: Скачайте скрипты
 
-1. **Скачайте скрипт**:
+Выберите один из двух методов.
 
+#### Метод А: Клонирование репозитория (рекомендуется)
+Этот способ скачает все файлы проекта, включая оба скрипта и будущие обновления.
 ```powershell
-# Метод 1: Прямое скачивание
-Invoke-WebRequest -Uri "https://raw.githubusercontent.com/hypo69/mcp-powershell-server/main/mcp-powershell-stdio.ps1" -OutFile "mcp-powershell-stdio.ps1"
-
-# Метод 2: Клонирование репозитория
 git clone https://github.com/hypo69/mcp-powershell-server.git
 cd mcp-powershell-server
 ```
 
-2. **Проверьте права выполнения**:
+#### Метод Б: Прямое скачивание (для отдельных файлов)
+```powershell
+# Скрипт для локальной интеграции (STDIO)
+$uriStdio = "https://raw.githubusercontent.com/hypo69/mcp-powershell-server/main/mcp-powershell-stdio.ps1"
+Invoke-WebRequest -Uri $uriStdio -OutFile "mcp-powershell-stdio.ps1"
+
+# Скрипт для сетевого сервера (HTTP/S)
+$uriHttp = "https://raw.githubusercontent.com/hypo69/mcp-powershell-server/main/mcp-powershell-http.ps1"
+Invoke-WebRequest -Uri $uriHttp -OutFile "mcp-powershell-http.ps1"
+```
+
+### Шаг 2: Настройте среду выполнения (только для Windows)
 
 ```powershell
-Get-ExecutionPolicy
+# Если команда Get-ExecutionPolicy вернет 'Restricted', измените ее:
 Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 ```
 
-3. **Тестовый запуск**:
+### Шаг 3: Выберите режим и запустите сервер
 
+#### Режим 1: STDIO (локальное использование)
 ```powershell
-echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}' | .\mcp-powershell-stdio.ps1
+# Тестовый запуск
+echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}' | pwsh .\mcp-powershell-stdio.ps1
 ```
 
----
-
-### Установка HTTP(S) сервера
-
+#### Режим 2: HTTP(S) (сетевое использование)
 ```powershell
-# Запуск HTTP сервера на порту 8091 с токеном авторизации
-powershell.exe -File .\mcp-powershell-http.ps1 `
-    -Port 8091 `
-    -ServerHost "localhost" `
-    -AuthToken "supersecrettoken"
+# Запуск HTTP сервера
+pwsh -File .\mcp-powershell-http.ps1 -Port 8091 -AuthToken "supersecrettoken"
 
-# Для HTTPS добавьте параметр -CertThumbprint "<Thumbprint>"
-```
-
----
-
-### Установка как системный сервис (опционально)
-
-```powershell
-New-Service -Name "MCP-PowerShell" -BinaryPathName "powershell.exe -File C:\Path\To\mcp-powershell-stdio.ps1" -DisplayName "MCP PowerShell Server"
+# Запуск HTTPS сервера (требуется отпечаток сертификата)
+# pwsh -File .\mcp-powershell-http.ps1 -Port 8443 -AuthToken "supersecrettoken" -CertThumbprint "A1B2C3D4..."
 ```
 
 ---
@@ -96,13 +119,62 @@ New-Service -Name "MCP-PowerShell" -BinaryPathName "powershell.exe -File C:\Path
 
 ### Переменные окружения
 
+Вы можете управлять поведением сервера, установив следующие переменные окружения перед запуском.
+
 ```powershell
+# Путь для лог-файла (по умолчанию: %TEMP%\mcp-powershell-server.log)
 $env:MCP_LOG_PATH = "C:\Logs\mcp-powershell.log"
-$env:MCP_LOG_LEVEL = "INFO"  # DEBUG, INFO, WARNING, ERROR
-$env:MCP_MAX_LOG_SIZE = "50" # МБ
+
+# Уровень логирования (DEBUG, INFO, WARNING, ERROR)
+$env:MCP_LOG_LEVEL = "INFO"
+
+# Максимальный размер лога в МБ (по умолчанию: 10)
+$env:MCP_MAX_LOG_SIZE = "50"
 ```
 
-### Настройка MCP клиентов
+### 🔐 Настройка HTTPS: Как получить отпечаток сертификата (Thumbprint) в Windows
+
+1.  **Создайте самоподписанный сертификат (для тестов)**. Откройте PowerShell **от имени администратора**:
+    ```powershell
+    New-SelfSignedCertificate -DnsName "localhost" -CertStoreLocation "Cert:\CurrentUser\My"
+    ```
+    В выводе команды вы сразу увидите `Thumbprint`.
+
+2.  **Скопируйте отпечаток**. Эта команда найдет сертификат и скопирует его отпечаток в буфер обмена:
+    ```powershell
+    Get-ChildItem Cert:\CurrentUser\My | Where-Object { $_.DnsNameList -contains "localhost" } | Select -First 1 -ExpandProperty Thumbprint | Set-Clipboard
+    ```
+
+---
+
+## 🚀 Запуск в качестве службы (автозагрузка при старте ОС)
+
+Для надежной работы рекомендуется запускать `mcp-powershell-http.ps1` как службу.
+
+### Windows (с помощью NSSM)
+
+1.  **Скачайте [NSSM](https://nssm.cc/download)** и скопируйте `nssm.exe` в `C:\Windows\System32`.
+2.  **Установите службу** (в PowerShell от имени администратора):
+    ```powershell
+    nssm install MCP-PowerShell-Server
+    ```
+3.  В открывшемся GUI укажите:
+    *   **Path**: `C:\Program Files\PowerShell\7\pwsh.exe`
+    *   **Startup directory**: `C:\Scripts\mcp-server` (где лежит ваш скрипт)
+    *   **Arguments**: `-NoProfile -File "C:\Scripts\mcp-server\mcp-powershell-http.ps1" -Port 8443 -AuthToken "MySecretToken"`
+4.  **Запустите и включите автозагрузку**:
+    ```powershell
+    Start-Service MCP-PowerShell-Server
+    Set-Service -Name MCP-PowerShell-Server -StartupType Automatic
+    ```
+
+### Linux (systemd) и macOS (launchd)
+
+Инструкции по настройке служб для Linux и macOS доступны в [полной документации](docs/SERVICE_SETUP.md).
+
+---
+
+## 🔧 Конфигурация клиентов (для STDIO)
 
 #### Claude Desktop
 
@@ -110,8 +182,8 @@ $env:MCP_MAX_LOG_SIZE = "50" # МБ
 {
   "mcpServers": {
     "powershell": {
-      "command": "powershell.exe",
-      "args": ["-File", "C:\\Path\\To\\mcp-powershell-stdio.ps1"],
+      "command": "pwsh",
+      "args": ["-NoProfile", "-File", "C:\\Path\\To\\mcp-powershell-stdio.ps1"],
       "env": { "MCP_LOG_LEVEL": "INFO" }
     }
   }
@@ -124,8 +196,8 @@ $env:MCP_MAX_LOG_SIZE = "50" # МБ
 {
   "mcp": {
     "powershell": {
-      "command": "powershell.exe",
-      "args": ["-File", "C:\\Path\\To\\mcp-powershell-stdio.ps1"]
+      "command": "pwsh",
+      "args": ["-NoProfile", "-File", "C:\\Path\\To\\mcp-powershell-stdio.ps1"]
     }
   }
 }
@@ -133,212 +205,221 @@ $env:MCP_MAX_LOG_SIZE = "50" # МБ
 
 ---
 
+## 📑 Таблица методов MCP
+
+
+| Метод MCP         | Описание                        | Параметры             | Пример запроса                                                                                                                               |                                   |
+| ----------------- | ------------------------------- | --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------- |
+| `initialize`      | Инициализация сервера MCP       | `{}`                  | \`echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}'                                                                          | pwsh .\mcp-powershell-stdio.ps1\` |
+| `tools/call`      | Выполнение PowerShell скрипта   | `{ name, arguments }` | \`echo '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"run-script","arguments":{"script":"Get-Date","timeoutSeconds":10}}}' | pwsh .\mcp-powershell-stdio.ps1\` |
+| `tools/list`      | Получение списка инструментов   | `{}`                  | \`echo '{"jsonrpc":"2.0","id":3,"method":"tools/list","params":{}}'                                                                          | pwsh .\mcp-powershell-stdio.ps1\` |
+| `tools/status`    | Получение статуса сервера       | `{}`                  | \`echo '{"jsonrpc":"2.0","id":4,"method":"tools/status","params":{}}'                                                                        | pwsh .\mcp-powershell-stdio.ps1\` |
+| `tools/logs`      | Получение последних логов       | `{ count }`           | \`echo '{"jsonrpc":"2.0","id":5,"method":"tools/logs","params":{"count":10}}'                                                                | pwsh .\mcp-powershell-stdio.ps1\` |
+| `tools/terminate` | Завершение выполнения скрипта   | `{ id }`              | \`echo '{"jsonrpc":"2.0","id":6,"method":"tools/terminate","params":{"id":123}}'                                                             | pwsh .\mcp-powershell-stdio.ps1\` |
+| `tools/update`    | Обновление конфигурации сервера | `{ config }`          | \`echo '{"jsonrpc":"2.0","id":7,"method":"tools/update","params":{"config":{"LogLevel":"DEBUG"}}}'                                           | pwsh .\mcp-powershell-stdio.ps1\` |
+
+---
+
+
 ## 🛠️ Примеры использования
 
-### STDIO
+### Примеры для режима STDIO
 
+#### Пример 1: Тестовый запрос (Get-Date)
+```powershell
+$request = @{
+    jsonrpc = "2.0"; id = 1; method = "tools/call"
+    params = @{ name = "run-script"; arguments = @{ script = "Get-Date"; timeoutSeconds = 10 } }
+} | ConvertTo-Json -Depth 5
 
-Инициализация соединения (JSON-RPC)
-{
-  "jsonrpc": "2.0",
-  "id": 1,
-  "method": "initialize",
-  "params": {
-    "protocolVersion": "2024-11-05",
-    "capabilities": {},
-    "clientInfo": {
-      "name": "my-client",
-      "version": "1.0.0"
+$request | pwsh .\mcp-powershell-stdio.ps1
+```
+
+#### Пример 2: Системная информация
+```powershell
+$request = @{
+    jsonrpc = "2.0"; id = 2; method = "tools/call"
+    params = @{ name = "run-script"; arguments = @{ script = "Get-ComputerInfo | Select OsName, OsVersion, CsTotalPhysicalMemory" } }
+} | ConvertTo-Json -Depth 5
+
+$request | pwsh .\mcp-powershell-stdio.ps1
+```
+
+#### Пример 3: Работа с файлами
+```powershell
+$script = "Get-ChildItem -Path $env:USERPROFILE -File | Sort LastWriteTime -Desc | Select -First 10 Name, Length"
+$request = @{
+    jsonrpc = "2.0"; id = 3; method = "tools/call"
+    params = @{ name = "run-script"; arguments = @{ script = $script; timeoutSeconds = 60 } }
+} | ConvertTo-Json -Depth 5
+
+$request | pwsh .\mcp-powershell-stdio.ps1
+```
+
+#### Пример 4: Скрипт с параметрами
+```powershell
+$script = "param($ProcessName, $Top = 5) Get-Process $ProcessName | Sort CPU -Desc | Select -First $Top Name, CPU"
+$request = @{
+    jsonrpc = "2.0"; id = 4; method = "tools/call"
+    params = @{
+        name = "run-script"
+        arguments = @{ script = $script; parameters = @{ ProcessName = "pwsh"; Top = 3 } }
     }
-  }
+} | ConvertTo-Json -Depth 5
+
+$request | pwsh .\mcp-powershell-stdio.ps1
+```
+
+### Примеры клиентов для режима HTTP(S)
+
+#### 🔹 PowerShell клиент (`Invoke-RestMethod`)
+```powershell
+$Url = "https://localhost:8443/execute"
+$Token = "MySecretToken"
+$Headers = @{ "Authorization" = "Bearer $Token"; "Content-Type"  = "application/json" }
+$Payload = @{ command = "Get-Process pwsh | ConvertTo-Json" } | ConvertTo-Json
+
+# Для PowerShell 7+ используйте -SkipCertificateCheck
+$Response = Invoke-RestMethod -Uri $Url -Method Post -Headers $Headers -Body $Payload -SkipCertificateCheck
+$Response | ConvertTo-Json -Depth 5
+```
+
+
+## 🔹 PowerShell клиент (Invoke-RestMethod)
+
+```powershell
+# Настройки сервера
+$Url = "https://localhost:8443/execute"
+$Token = "SuperSecretToken123"
+
+# Заголовки авторизации
+$Headers = @{
+    "Authorization" = "Bearer $Token"
+    "Content-Type"  = "application/json"
 }
-Выполнение скрипта
-{
-  "jsonrpc": "2.0",
-  "id": 2,
-  "method": "tools/call",
-  "params": {
-    "name": "run-script",
-    "arguments": {
-      "script": "Get-Date",
-      "timeoutSeconds": 10
+
+# Команда PowerShell для выполнения на сервере
+$Payload = @{
+    command = "Get-Process | Select-Object -First 5 | ConvertTo-Json -Depth 3"
+} | ConvertTo-Json -Depth 3
+
+# Игнорируем self-signed сертификат (для теста)
+add-type @"
+using System.Net;
+using System.Security.Cryptography.X509Certificates;
+public class TrustAllCertsPolicy : ICertificatePolicy {
+    public bool CheckValidationResult(
+        ServicePoint srvPoint, X509Certificate certificate,
+        WebRequest request, int certificateProblem) {
+        return true;
     }
-  }
 }
+"@
+[System.Net.ServicePointManager]::CertificatePolicy = New-Object TrustAllCertsPolicy
 
-
-
-```powershell
-# 1️⃣ Тестовый запрос
-$request = @{
-    jsonrpc = "2.0"
-    id = 1
-    method = "tools/call"
-    params = @{
-        name = "run-script"
-        arguments = @{
-            script = "Get-Date"
-            timeoutSeconds = 10
-        }
-    }
-} | ConvertTo-Json -Depth 5
-
-$request | .\mcp-powershell-stdio.ps1
+# Отправляем запрос
+try {
+    $Response = Invoke-RestMethod -Uri $Url -Method Post -Headers $Headers -Body $Payload
+    Write-Host "Ответ от MCP PowerShell Server:" -ForegroundColor Green
+    $Response | ConvertTo-Json -Depth 5 | Out-String
+} catch {
+    Write-Host "Ошибка запроса: $($_.Exception.Message)" -ForegroundColor Red
+}
 ```
 
-```powershell
-# 2️⃣ Системная информация
-$scriptRequest = @{
-    jsonrpc = "2.0"
-    id = 3
-    method = "tools/call"
-    params = @{
-        name = "run-script"
-        arguments = @{
-            script = "Get-ComputerInfo | Select-Object WindowsProductName, WindowsVersion, TotalPhysicalMemory"
-            timeoutSeconds = 30
-        }
-    }
-} | ConvertTo-Json -Depth 5
+---
 
-$scriptRequest | .\mcp-powershell-stdio.ps1
+## ⚡ Пример вывода
+
+```json
+[
+  {
+    "Name": "pwsh",
+    "Id": 12345,
+    "CPU": 0.03
+  },
+  {
+    "Name": "explorer",
+    "Id": 6789,
+    "CPU": 0.12
+  }
+]
 ```
 
-```powershell
-# 3️⃣ Работа с файлами
-$script = "Get-ChildItem -Path $env:USERPROFILE -File | Sort-Object LastWriteTime -Descending | Select-Object -First 10 Name, Length, LastWriteTime"
-$request = @{
-    jsonrpc = "2.0"
-    id = 4
-    method = "tools/call"
-    params = @{
-        name = "run-script"
-        arguments = @{
-            script = $script
-            workingDirectory = "C:\Users\Username"
-            timeoutSeconds = 60
-        }
-    }
-} | ConvertTo-Json -Depth 5
 
-$request | .\mcp-powershell-stdio.ps1
+#### cURL
+```bash
+curl --insecure -X POST "https://localhost:8443/execute" \
+  -H "Authorization: Bearer MySecretToken" \
+  -H "Content-Type: application/json" \
+  -d '{"command": "Get-Process | Sort-Object CPU -Descending | Select-Object -First 3 Name, CPU | ConvertTo-Json"}'
 ```
 
-```powershell
-# 4️⃣ Мониторинг процессов
-$script = "Get-Process | Where-Object {$_.CPU -gt 10} | Sort-Object CPU -Descending | Select-Object -First 5 Name, CPU, WorkingSet"
-$request = @{
-    jsonrpc = "2.0"
-    id = 5
-    method = "tools/call"
-    params = @{
-        name = "run-script"
-        arguments = @{
-            script = $script
-            timeoutSeconds = 45
-        }
-    }
-} | ConvertTo-Json -Depth 5
+#### 🟢 Node.js клиент
+```javascript
+import fetch from "node-fetch";
+import https from "https-proxy-agent";
 
-$request | .\mcp-powershell-stdio.ps1
+const agent = new https.Agent({ rejectUnauthorized: false });
+const url = "https://localhost:8443/execute";
+const headers = { "Authorization": "Bearer MySecretToken", "Content-Type": "application/json" };
+const payload = { command: "Get-Service -Name Spooler | ConvertTo-Json" };
+
+fetch(url, { method: "POST", headers, body: JSON.stringify(payload), agent })
+  .then(res => res.json())
+  .then(json => console.log(json))
+  .catch(err => console.error(err));
 ```
 
-```powershell
-# 5️⃣ Скрипт с параметрами
-$script = "param($ProcessName, $Top = 5) Get-Process $ProcessName | Sort-Object CPU -Descending | Select-Object -First $Top Name, CPU, WorkingSet"
-$request = @{
-    jsonrpc = "2.0"
-    id = 8
-    method = "tools/call"
-    params = @{
-        name = "run-script"
-        arguments = @{
-            script = $script
-            parameters = @{
-                ProcessName = "powershell"
-                Top = 3
-            }
-            timeoutSeconds = 30
-        }
-    }
-} | ConvertTo-Json -Depth 5
+#### 🐍 Python клиент
+```python
+import requests, json, urllib3
 
-$request | .\mcp-powershell-stdio.ps1
-```
+urllib3.disable_warnings()
+url = "https://localhost:8443/execute"
+headers = {"Authorization": "Bearer MySecretToken", "Content-Type": "application/json"}
+payload = {"command": "Get-Process pwsh | Select Name, CPU | ConvertTo-Json"}
 
-### HTTP(S)
-
-```powershell
-$Url = "http://localhost:8091/"
-$Token = "supersecrettoken"
-
-$Body = @{
-    jsonrpc = "2.0"
-    id = 2
-    method = "tools/call"
-    params = @{
-        name = "run-script"
-        arguments = @{
-            script = "Get-Date"
-            timeoutSeconds = 10
-        }
-    }
-} | ConvertTo-Json -Depth 5
-
-Invoke-RestMethod -Uri $Url -Method Post -Body $Body -Headers @{ Authorization = "Bearer $Token" } -ContentType "application/json"
+response = requests.post(url, headers=headers, data=json.dumps(payload), verify=False)
+print(response.json())
 ```
 
 ---
 
 ## 🛡️ Безопасность
 
-* **Изоляция процессов** — каждый скрипт выполняется в отдельном PowerShell процессе
-* **Контролируемые таймауты** — автоматическое прерывание долгих скриптов
-* **Валидация входных данных** — проверка всех MCP запросов
-* **Логирование действий** — полная трассировка для аудита
-
-**Рекомендации:**
-
-```powershell
-# 1. Запуск под ограниченной учетной записью
-New-LocalUser -Name "MCPService" -NoPassword -UserMayNotChangePassword
-
-# 2. Ограничение прав доступа
-# Настройте права доступа только к необходимым папкам
-
-# 3. Сетевая изоляция
-# Настройте firewall для ограничения подключений
-
-# 4. Мониторинг ресурсов
-# Установите лимиты на CPU и память
-```
+*   **Изоляция процессов**: Каждый скрипт выполняется в отдельном, временном процессе.
+*   **Логирование действий**: Полная трассировка для аудита безопасности.
+*   **Рекомендации**: Запускайте под ограниченной учетной записью, используйте Firewall и HTTPS с надежным сертификатом в продакшене.
 
 ---
 
-## 🔍 Отладка и диагностика
+## 🔍 Отладка и мониторинг
 
 ```powershell
-$logPath = Join-Path $env:TEMP "mcp-powershell-server.log"
-Get-Content $logPath -Tail 10
+# Включить подробное логирование
+$env:MCP_LOG_LEVEL = "DEBUG"
+
+# Посмотреть последние 20 строк лога
+$logPath = $env:MCP_LOG_PATH -or (Join-Path $env:TEMP "mcp-powershell-server.log")
+Get-Content $logPath -Tail 20
+
+# Отслеживать логи в реальном времени
+Get-Content $logPath -Wait
 ```
 
-```powershell
-# Мониторинг в реальном времени
-Get-Content $logPath -Wait | ForEach-Object { Write-Host $_ }
-```
-
----
-
-## 📈 Мониторинг и метрики
+### Сбор метрик
 
 ```powershell
 function Get-MCPMetrics {
-    $logPath = Join-Path $env:TEMP "mcp-powershell-server.log"
-    if (-not (Test-Path $logPath)) { return }
+    $logPath = $env:MCP_LOG_PATH -or (Join-Path $env:TEMP "mcp-powershell-server.log")
+    if (-not (Test-Path $logPath)) { Write-Warning "Log file not found."; return }
+    
     $logContent = Get-Content $logPath
-    $todayLogs = $logContent | Where-Object { $_ -match (Get-Date -Format "yyyy-MM-dd") }
+    $todayLogs = $logContent | Where-Object { $_.StartsWith((Get-Date).ToString("yyyy-MM-dd")) }
+    
     return @{
-        TotalRequests = ($todayLogs | Where-Object { $_ -match "Обработка MCP метода" }).Count
+        TotalRequests = ($todayLogs | Where-Object { $_ -match "Обработка MCP" }).Count
         Errors = ($todayLogs | Where-Object { $_ -match "\[ERROR\]" }).Count
         Warnings = ($todayLogs | Where-Object { $_ -match "\[WARNING\]" }).Count
         SuccessfulExecutions = ($todayLogs | Where-Object { $_ -match "успешно" }).Count
@@ -350,25 +431,13 @@ Get-MCPMetrics | Format-Table -AutoSize
 
 ---
 
-## 📚 Дополнительные ресурсы
+## 📜 Лицензия
 
-* [Model Context Protocol](https://modelcontextprotocol.io/)
-* [MCP Specification](https://spec.modelcontextprotocol.io/)
-* [MCP SDK](https://github.com/modelcontextprotocol/servers)
-* [PowerShell Documentation](https://docs.microsoft.com/en-us/powershell/)
-* [PowerShell Gallery](https://www.powershellgallery.com/)
-* [PowerShell Community](https://github.com/PowerShell/PowerShell)
+MIT © [hypo69](https://github.com/hypo69/mcp-powershell-server)
 
 ---
 
-## 📄 Лицензия
+## 👥 Авторы
 
-MIT License — см. файл [LICENSE](LICENSE)
-
----
-
-## 👥 Авторы и участники
-
-* **Основной разработчик** — @hypo69
-* **Участники** — [contributors](https://github.com/hypo69/mcp-powershell-server/contributors)
-
+*   **Основной разработчик**: @hypo69
+*   Смотрите также список [участников](https://github.com/hypo69/mcp-powershell-server/contributors), которые внесли свой вклад в этот проект.
