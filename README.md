@@ -37,9 +37,10 @@ MCP PowerShell Server - это реализация сервера Model Context
 
 ### Быстрая установка STDIO сервера
 1. **Скачайте скрипт**:
-   ```powershell
-   Invoke-WebRequest -Uri "https://raw.githubusercontent.com/hypo69/mcp-powershell-stdio.ps1" -OutFile "mcp-powershell-stdio.ps1"
-````
+
+    ```powershell
+       Invoke-WebRequest -Uri "https://raw.githubusercontent.com/hypo69/mcp-powershell-stdio.ps1" -OutFile "mcp-powershell-stdio.ps1"
+    ```
 
 2. **Проверьте права выполнения**:
 
