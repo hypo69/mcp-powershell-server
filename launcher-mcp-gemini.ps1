@@ -1,48 +1,96 @@
-## \file launcher.ps1
+## \file launcher-mcp-gemini.ps1
 # -*- coding: utf-8 -*-
+#! .pyenv/bin/powershell
 
 <#
 .SYNOPSIS
-    Главный скрипт для запуска MCP сервера и настройки работы с Gemini CLI
-
+    Launcher для MCP PowerShell сервера с поддержкой Gemini CLI
+    
 .DESCRIPTION
-    Автоматически запускает MCP PowerShell сервер в отдельном окне и настраивает
-    gemini-cli для работы с ним. Обеспечивает правильную последовательность запуска.
-
+    Упрощенный launcher для запуска MCP сервера и интеграции с gemini-cli.
+    Автоматически определяет пути к серверам в структуре проекта.
+    
 .PARAMETER ApiKey
-    Gemini API ключ
-
-.PARAMETER LaunchGemini
-    Запустить gemini-cli в интерактивном режиме после настройки MCP
-
-.PARAMETER Model
-    Модель Gemini для использования (по умолчанию gemini-2.5-flash)
-
+    Gemini API ключ для настройки CLI
+    
+.PARAMETER Mode
+    Режим запуска: 'stdio' (для gemini-cli) или 'http' (для REST API)
+    
+.PARAMETER Port
+    Порт для HTTP сервера (только для режима 'http')
+    
+.PARAMETER Test
+    Запустить тестовый сервер вместо основного
+    
 .EXAMPLE
-    .\start-mcp-gemini.ps1 -ApiKey "your-api-key"
-
+    .\launcher-mcp-gemini.ps1 -ApiKey "your-api-key"
+    
 .EXAMPLE
-    .\start-mcp-gemini.ps1 -ApiKey "your-api-key" -LaunchGemini -Model "gemini-2.5-pro"
+    .\launcher-mcp-gemini.ps1 -Mode http -Port 8090
+    
+.EXAMPLE
+    .\launcher-mcp-gemini.ps1 -Test
 #>
 
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $false)]
     [string]$ApiKey,
-
+    
     [Parameter(Mandatory = $false)]
-    [switch]$LaunchGemini,
-
+    [ValidateSet("stdio", "http")]
+    [string]$Mode = "stdio",
+    
     [Parameter(Mandatory = $false)]
-    [ValidateSet('gemini-2.5-pro', 'gemini-2.5-flash')]
-    [string]$Model = 'gemini-2.5-flash',
-
+    [int]$Port = 8090,
+    
+    [Parameter(Mandatory = $false)]
+    [switch]$Test,
+    
     [Parameter(Mandatory = $false)]
     [switch]$Help
 )
 
-# === Вспомогательные функции ===
-function Write-Launch {
+function Show-Help {
+    $helpText = @"
+
+MCP PowerShell Server Launcher
+
+ОПИСАНИЕ:
+    Launcher для запуска MCP PowerShell сервера с автоматическим
+    определением путей и настройкой интеграции с gemini-cli.
+
+ИСПОЛЬЗОВАНИЕ:
+    .\launcher-mcp-gemini.ps1 [параметры]
+
+ПАРАМЕТРЫ:
+    -ApiKey <ключ>     Gemini API ключ (для интеграции с gemini-cli)
+    -Mode <режим>      Режим запуска: 'stdio' или 'http' (по умолчанию: stdio)
+    -Port <порт>       Порт для HTTP сервера (по умолчанию: 8090)
+    -Test              Запустить тестовый сервер
+    -Help              Показать эту справку
+
+ПРИМЕРЫ:
+    # Запуск STDIO сервера для gemini-cli
+    .\launcher-mcp-gemini.ps1 -ApiKey "your-gemini-api-key"
+    
+    # Запуск HTTP сервера
+    .\launcher-mcp-gemini.ps1 -Mode http -Port 8090
+    
+    # Запуск тестового сервера
+    .\launcher-mcp-gemini.ps1 -Test
+
+СТРУКТУРА ПРОЕКТА:
+    Launcher автоматически определяет расположение серверов в:
+    - src/servers/mcp-powershell-stdio.ps1
+    - src/servers/mcp-powershell-http.ps1  
+    - src/servers/test-mcp.ps1
+
+"@
+    Write-Host $helpText -ForegroundColor Cyan
+}
+
+function Write-Status {
     param(
         [string]$Message,
         [string]$Type = 'Info'
@@ -52,49 +100,63 @@ function Write-Launch {
         'Warning' { 'Yellow' }
         'Error' { 'Red' }
         'Info' { 'Cyan' }
-        'Title' { 'Magenta' }
         default { 'White' }
     }
-
-    if ($Type -eq 'Title') {
-        Write-Host "`n$('=' * 60)" -ForegroundColor $color
-        Write-Host " $Message" -ForegroundColor $color
-        Write-Host "$('=' * 60)`n" -ForegroundColor $color
-    } else {
-        $prefix = switch ($Type) {
-            'Success' { '[✓]' }
-            'Warning' { '[!]' }
-            'Error' { '[✗]' }
-            'Info' { '[i]' }
-            default { '[-]' }
-        }
-        Write-Host "$prefix $Message" -ForegroundColor $color
+    $prefix = switch ($Type) {
+        'Success' { '[✓]' }
+        'Warning' { '[!]' }
+        'Error' { '[✗]' }
+        'Info' { '[i]' }
+        default { '[-]' }
     }
+    Write-Host "$prefix $Message" -ForegroundColor $color
 }
 
-function Show-Help {
-    $helpText = @"
-MCP PowerShell Server + Gemini CLI Launcher
+function Find-ServerPath {
+    param([string]$ServerName)
+    
+    # Поиск в различных возможных путях
+    $possiblePaths = @(
+        "src\servers\$ServerName",
+        "servers\$ServerName", 
+        $ServerName
+    )
+    
+    foreach ($path in $possiblePaths) {
+        if (Test-Path $path) {
+            return $path
+        }
+    }
+    
+    return $null
+}
 
-ОПИСАНИЕ:
-    Главный скрипт для интеграции MCP PowerShell сервера с gemini-cli.
-    Автоматически запускает сервер в отдельном окне и настраивает CLI.
-
-ИСПОЛЬЗОВАНИЕ:
-    .\start-mcp-gemini.ps1 [параметры]
-
-ПАРАМЕТРЫ:
-    -ApiKey <ключ>      Gemini API ключ (обязательный)
-    -LaunchGemini       Запустить gemini-cli после настройки
-    -Model <модель>     Модель Gemini (gemini-2.5-pro | gemini-2.5-flash)
-    -Help               Показать эту справку
-
-ПРИМЕРЫ:
-    .\start-mcp-gemini.ps1 -ApiKey "your-api-key"
-    .\start-mcp-gemini.ps1 -ApiKey "your-key" -LaunchGemini
-    .\start-mcp-gemini.ps1 -ApiKey "your-key" -LaunchGemini -Model "gemini-2.5-pro"
-"@
-    Write-Host $helpText -ForegroundColor Cyan
+function Setup-GeminiConfig {
+    param([string]$ServerPath)
+    
+    Write-Status "Настройка конфигурации MCP для gemini-cli..." -Type 'Info'
+    
+    $configDir = Join-Path $env:USERPROFILE '.config\gemini'
+    if (-not (Test-Path $configDir)) {
+        New-Item -Path $configDir -ItemType Directory -Force | Out-Null
+    }
+    
+    $fullServerPath = Resolve-Path $ServerPath
+    $mcpConfig = @{
+        mcpServers = @{
+            powershell = @{
+                command = "pwsh"
+                args = @("-File", $fullServerPath.Path)
+                env = @{}
+            }
+        }
+    } | ConvertTo-Json -Depth 5
+    
+    $configFile = Join-Path $configDir 'mcp_servers.json'
+    $mcpConfig | Set-Content -Path $configFile -Encoding UTF8
+    
+    Write-Status "Конфигурация сохранена: $configFile" -Type 'Success'
+    return $configFile
 }
 
 if ($Help) {
@@ -102,134 +164,89 @@ if ($Help) {
     return
 }
 
-# === Проверка и запрос API-ключа ===
-function Request-ApiKey {
-    param (
-        [string]$EnvVar = "GEMINI_API_KEY"
-    )
+Write-Host ""
+Write-Host "=== MCP PowerShell Server Launcher ===" -ForegroundColor Cyan
+Write-Host ""
 
-    $apiKey = ${env:$EnvVar}  # корректное обращение к переменной окружения
-    if (-not $apiKey) {
-        Write-Launch "API-ключ не найден в переменной окружения `$EnvVar." -Type 'Warning'
-        while ($true) {
-            $apiKey = Read-Host "Введите Gemini API ключ"
-            if ($apiKey) {
-                ${env:$EnvVar} = $apiKey
-                break
-            }
-            Write-Launch "API-ключ не может быть пустым. Повторите ввод." -Type 'Error'
-        }
-    }
-    return $apiKey
+# Определение пути к серверу
+if ($Test) {
+    $serverScript = Find-ServerPath "test-mcp.ps1"
+    $serverName = "Test MCP Server"
+} elseif ($Mode -eq "http") {
+    $serverScript = Find-ServerPath "mcp-powershell-http.ps1"  
+    $serverName = "HTTP MCP Server"
+} else {
+    $serverScript = Find-ServerPath "mcp-powershell-stdio.ps1"
+    $serverName = "STDIO MCP Server"
 }
 
-if (-not $ApiKey) {
-    $ApiKey = Request-ApiKey
-}
-
-# === Проверка системных требований ===
-function Test-Prerequisites {
-    Write-Launch "Проверка системных требований..." -Type 'Info'
-    $issues = @()
-
-    if ($PSVersionTable.PSVersion.Major -lt 7) {
-        $issues += "Требуется PowerShell 7+. Текущая: $($PSVersionTable.PSVersion)"
-    } else {
-        Write-Launch "PowerShell $($PSVersionTable.PSVersion) - OK" -Type 'Success'
-    }
-
-    try {
-        $null = & gemini --version 2>&1
-        Write-Launch "gemini-cli найден" -Type 'Success'
-    } catch {
-        $issues += "gemini-cli не найден в PATH"
-    }
-
-    $mcpScript = Join-Path $PSScriptRoot 'mcp-powershell-server/mcp-powershell-stdio.ps1'
-    if (-not (Test-Path $mcpScript)) {
-        $issues += "MCP сервер не найден: $mcpScript"
-    } else {
-        Write-Launch "MCP сервер найден" -Type 'Success'
-    }
-
-    return $issues
-}
-
-# === Запуск MCP сервера ===
-function Start-MCPServer {
-    Write-Launch "Запуск MCP PowerShell сервера..." -Type 'Info'
-    $launcherScript = Join-Path $PSScriptRoot 'src/server/launch-mcp-stdio.ps1'
-
-    try {
-        $processArgs = @{
-            FilePath     = 'pwsh'
-            ArgumentList = @('-NoProfile', '-File', $launcherScript)
-            WindowStyle  = 'Normal'
-            PassThru     = $true
-        }
-        $serverProcess = Start-Process @processArgs
-        Write-Launch "MCP сервер запущен (PID: $($serverProcess.Id))" -Type 'Success'
-        Start-Sleep -Seconds 3
-        return $serverProcess
-    } catch {
-        Write-Launch "Ошибка запуска MCP сервера: $($_.Exception.Message)" -Type 'Error'
-        return $null
-    }
-}
-
-# === Создание конфигурации MCP ===
-function New-MCPConfiguration {
-    Write-Launch "Создание конфигурации MCP..." -Type 'Info'
-    $mcpServerPath = Join-Path $PSScriptRoot 'mcp-powershell-server/mcp-powershell-stdio.ps1'
-    $mcpServerPath = Resolve-Path $mcpServerPath
-
-    $mcpConfig = @{
-        mcpServers = @{
-            powershell = @{
-                command = "pwsh"
-                args    = @("-File", $mcpServerPath.ToString())
-                env     = @{ POWERSHELL_EXECUTION_POLICY = "RemoteSigned" }
-            }
-        }
-    }
-
-    $configDir = Join-Path $PSScriptRoot 'config'
-    if (-not (Test-Path $configDir)) { New-Item -Path $configDir -ItemType Directory -Force | Out-Null }
-
-    $configFile = Join-Path $configDir 'mcp_servers.json'
-    $mcpConfig | ConvertTo-Json -Depth 5 | Set-Content -Path $configFile -Encoding UTF8
-
-    Write-Launch "Конфигурация MCP сохранена: $configFile" -Type 'Success'
-    return $configFile
-}
-
-# === Запуск gemini-cli ===
-function Start-GeminiWithMCP {
-    param([string]$ConfigFile)
-
-    Write-Launch "Запуск gemini-cli с поддержкой MCP..." -Type 'Info'
-
-    try {
-        & gemini --mcp-config $ConfigFile -m $Model -i
-    } catch {
-        Write-Launch "Ошибка запуска gemini-cli: $($_.Exception.Message)" -Type 'Error'
-    }
-}
-
-# === Основной рабочий процесс ===
-$issues = Test-Prerequisites
-if ($issues.Count -gt 0) {
-    foreach ($i in $issues) { Write-Launch $i -Type 'Error' }
+if (-not $serverScript) {
+    Write-Status "ОШИБКА: Не найден серверный скрипт для режима '$Mode'" -Type 'Error'
+    Write-Status "Убедитесь, что вы находитесь в корневой папке проекта" -Type 'Warning'
     return
 }
 
-$serverProcess = Start-MCPServer
-if (-not $serverProcess) { return }
+Write-Status "Найден сервер: $serverScript" -Type 'Success'
 
-$configFile = New-MCPConfiguration
-
-if ($LaunchGemini) {
-    Start-GeminiWithMCP -ConfigFile $configFile
-} else {
-    Write-Launch "MCP сервер запущен и готов к работе. Для запуска gemini-cli используйте -LaunchGemini" -Type 'Success'
+# Настройка API ключа для gemini-cli
+if ($ApiKey) {
+    $env:GEMINI_API_KEY = $ApiKey
+    Write-Status "API ключ установлен" -Type 'Success'
 }
+
+# Специальная обработка для разных режимов
+switch ($Mode) {
+    "stdio" {
+        Write-Status "Запуск $serverName в STDIO режиме..." -Type 'Info'
+        
+        # Настройка конфигурации MCP если есть API ключ
+        if ($ApiKey) {
+            $configFile = Setup-GeminiConfig -ServerPath $serverScript
+            
+            Write-Host ""
+            Write-Host "=== ГОТОВО К РАБОТЕ ===" -ForegroundColor Green
+            Write-Host ""
+            Write-Host "Использование с gemini-cli:" -ForegroundColor Yellow
+            Write-Host "  gemini --mcp-config `"$configFile`" -m gemini-2.5-pro -p `"your prompt`"" -ForegroundColor Gray
+            Write-Host ""
+            Write-Host "Интерактивный режим:" -ForegroundColor Yellow  
+            Write-Host "  gemini --mcp-config `"$configFile`" -i" -ForegroundColor Gray
+            Write-Host ""
+        }
+        
+        # Запуск STDIO сервера
+        & $serverScript
+    }
+    
+    "http" {
+        Write-Status "Запуск $serverName на порту $Port..." -Type 'Info'
+        
+        # Проверка доступности порта
+        try {
+            $tcpListener = New-Object System.Net.Sockets.TcpListener([System.Net.IPAddress]::Loopback, $Port)
+            $tcpListener.Start()
+            $tcpListener.Stop()
+            Write-Status "Порт $Port доступен" -Type 'Success'
+        }
+        catch {
+            Write-Status "ОШИБКА: Порт $Port недоступен" -Type 'Error'
+            return
+        }
+        
+        Write-Host ""
+        Write-Host "=== HTTP СЕРВЕР ЗАПУЩЕН ===" -ForegroundColor Green
+        Write-Host "URL: http://localhost:$Port/" -ForegroundColor Yellow
+        Write-Host "Для остановки используйте Ctrl+C" -ForegroundColor Gray
+        Write-Host ""
+        
+        # Запуск HTTP сервера
+        & $serverScript -Port $Port
+    }
+    
+    default {
+        Write-Status "Неизвестный режим: $Mode" -Type 'Error'
+        return
+    }
+}
+
+Write-Status "Сервер завершен" -Type 'Warning'

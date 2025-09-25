@@ -29,14 +29,23 @@ MCP PowerShell Server позволяет ИИ-ассистентам выпол�
 
 ## Структура проекта
 
+## Структура проекта
+
 ```
 mcp-powershell-server/
-├── mcp-powershell-stdio.ps1          # STDIO версия сервера
-├── mcp-powershell-http.ps1           # HTTP версия сервера  
-├── test-mcp.ps1                      # Тестовый сервер
-├── config.json                       # Файл конфигурации
-├── README.md                         # Этот файл
-└── how-to-use.md                     # Подробное руководство по использованию
+├── src/
+│   ├── clients/           # Клиентские приложения
+│   │   ├── node/         # Node.js клиент
+│   │   ├── powershell/   # PowerShell клиент  
+│   │   └── python/       # Python клиент
+│   └── servers/          # Серверные компоненты
+│       ├── mcp-powershell-stdio.ps1   # STDIO версия сервера
+│       ├── mcp-powershell-http.ps1    # HTTP версия сервера  
+│       ├── test-mcp.ps1               # Тестовый сервер
+│       └── config.json                # Файл конфигурации
+├── docs/                 # Документация
+├── README.md            # Этот файл
+└── how-to-use.md        # Подробное руководство
 ```
 
 ## Быстрый старт
@@ -45,29 +54,29 @@ mcp-powershell-server/
 
 1. **Запуск сервера:**
    ```powershell
-   .\mcp-powershell-stdio.ps1
+   .\src\servers\mcp-powershell-stdio.ps1
    ```
 
 2. **Тестирование:**
    ```powershell
-   .\test-mcp.ps1
+   .\src\servers\test-mcp.ps1
    ```
 
 ### HTTP режим
 
 1. **Базовый запуск:**
    ```powershell
-   .\mcp-powershell-http.ps1
+   .\src\servers\mcp-powershell-http.ps1
    ```
 
 2. **С настраиваемыми параметрами:**
    ```powershell
-   .\mcp-powershell-http.ps1 -Port 9090 -ServerHost "0.0.0.0"
+   .\src\servers\mcp-powershell-http.ps1 -Port 9090 -ServerHost "0.0.0.0"
    ```
 
 3. **С файлом конфигурации:**
    ```powershell
-   .\mcp-powershell-http.ps1 -ConfigFile "config.json"
+   .\src\servers\mcp-powershell-http.ps1 -ConfigFile ".\src\servers\config.json"
    ```
 
 ## Доступные MCP инструменты
