@@ -1,0 +1,48 @@
+{
+  "Port": 8090,
+  "Host": "localhost",
+  "MaxConcurrentRequests": 10,
+  "TimeoutSeconds": 300,
+  "LogLevel": "INFO",
+  "AllowedPaths": [
+    "C:\\Scripts\\",
+    "C:\\Tools\\",
+    "C:\\Temp\\",
+    "C:\\Users\\%USERNAME%\\Documents\\"
+  ],
+  "Security": {
+    "EnableScriptValidation": false,
+    "BlockDangerousCommands": false,
+    "RestrictedCommands": [
+      "Remove-Item -Path C:\\Windows\\*",
+      "Remove-Item -Path C:\\Program Files\\*",
+      "Format-Volume",
+      "Stop-Computer -Force",
+      "Restart-Computer -Force",
+      "Remove-Item -Path HKLM:\\*",
+      "New-ItemProperty -Path HKLM:\\*",
+      "Set-ItemProperty -Path HKLM:\\*",
+      "Remove-ItemProperty -Path HKLM:\\*"
+    ],
+    "AllowedModules": [
+      "Microsoft.PowerShell.*",
+      "PackageManagement",
+      "PowerShellGet",
+      "PSReadLine",
+      "ThreadJob"
+    ],
+    "MaxOutputSize": 10000,
+    "MaxScriptLength": 50000
+  },
+  "Logging": {
+    "LogFile": "%TEMP%\\mcp-powershell-server.log",
+    "MaxLogSize": "10MB",
+    "LogRotation": true,
+    "DetailedLogging": false
+  },
+  "Performance": {
+    "EnableCache": false,
+    "CacheTimeout": 300,
+    "MaxMemoryUsage": "512MB"
+  }
+}

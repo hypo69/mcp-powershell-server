@@ -1,4 +1,4 @@
-## \file mcp-powershell-server/mcp-powershell-http-improved.ps1
+## \file mcp-powershell-server/mcp-powershell-http.ps1
 # -*- coding: utf-8 -*-
 #! .pyenv/bin/powershell
 
@@ -840,4 +840,11 @@ try {
     }
     
     # Запуск сервера
-    Start-
+    Start-MCPServer -Config $script:ServerConfig
+}
+catch {
+    Write-Log "КРИТИЧЕСКАЯ ОШИБКА: $($_.Exception.Message)" -Level "ERROR"
+    exit 1
+}
+
+#endregion

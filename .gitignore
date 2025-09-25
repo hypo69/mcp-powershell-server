@@ -199,9 +199,7 @@ C:\WINDOWS\TEMP
 *.bkp
 # Files Copies
 *(*).*
-ai_games/
-config.json
+
+#config.json
 /src/config.json
-/SANDBOX/davidka/davidka.json
-_tmp
 .chat_history/*
