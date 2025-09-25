@@ -8,7 +8,8 @@
     "C:\\Scripts\\",
     "C:\\Tools\\",
     "C:\\Temp\\",
-    "C:\\Users\\%USERNAME%\\Documents\\"
+    "C:\\Users\\%USERNAME%\\Documents\\",
+    "%LOCALAPPDATA%\\HYPO69\\"
   ],
   "Security": {
     "EnableScriptValidation": false,
