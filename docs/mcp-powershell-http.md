@@ -2219,4 +2219,15 @@ Write-Host "Тестовый MCP сервер завершен. Обработа
     }
 }
 
-Объясни работу mcp-powershell-http сервера?
+Write-Host "Ошибка обработки запроса: $($_.Exception.Message)" -ForegroundColor Red
+    Send-Response @{
+            jsonrpc = "2.0"
+            id = $null
+            error = @{
+                code = -32603
+                message = "Внутренняя ошибка сервера"
+            }
+        }
+}
+}
+```
