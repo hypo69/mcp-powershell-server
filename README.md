@@ -1,4 +1,4 @@
-****# MCP PowerShell Server
+# MCP PowerShell Server
 
 Сервер MCP (Model Context Protocol) для выполнения PowerShell скриптов, поддерживающий как HTTP, так и STDIO режимы работы.
 
