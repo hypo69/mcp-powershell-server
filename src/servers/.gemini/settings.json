@@ -20,6 +20,19 @@
         "POWERSHELL_EXECUTION_POLICY": "RemoteSigned"
       }
     },
+    "wordpress-cli": {
+      "command": "pwsh",
+      "args": [
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "C:/powershell/modules/mcp-powershell-server/src/servers/mcp-powershell-wordpress.ps1"
+      ],
+      "env": {
+        "POWERSHELL_EXECUTION_POLICY": "RemoteSigned"
+      }
+    },
     "github": {
       "command": "npx",
       "args": [

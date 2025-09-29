@@ -38,7 +38,7 @@ param(
     [string]$ServerHost = "localhost",
     
     [Parameter(Mandatory = $false)]
-    [string]$ConfigFile = $null
+    [string]$ConfigFile = "mcp-powershell-http.config.json""
 )
 
 # Глобальные переменные конфигурации
