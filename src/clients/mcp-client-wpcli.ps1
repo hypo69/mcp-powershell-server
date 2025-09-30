@@ -18,7 +18,7 @@ $Headers = @{
 
 # Директория, где установлена рабочая копия WordPress. 
 # ⚠️ ОБЯЗАТЕЛЬНО замените на ваш путь!
-$WordPressPath = "C:\www\my-wordpress-site" 
+$WordPressPath = "E:\xampp\htdocs\domains\davidka.net\public_html" 
 
 # MCP-запрос: вызов инструмента "run-wp-cli"
 # Аргументы WP-CLI: 'user list' для получения списка пользователей

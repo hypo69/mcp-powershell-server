@@ -1,0 +1,44 @@
+{
+    "ServerConfig": {
+        "Name": "PowerShell Script Runner",
+        "Version": "1.1.1",
+        "Description": "Выполняет PowerShell скрипты через MCP протокол",
+        "MaxExecutionTime": 300,
+        "LogLevel": "INFO",
+        "Security": {
+            "EnableScriptValidation": false,
+            "BlockDangerousCommands": false,
+            "RestrictedCommands": [
+                "Remove-Item.*C:\\\\Windows",
+                "Remove-Item.*C:\\\\Program Files",
+                "Format-Volume",
+                "Stop-Computer",
+                "Restart-Computer",
+                "Remove-Item.*HKLM:",
+                "New-ItemProperty.*HKLM:",
+                "Set-ItemProperty.*HKLM:",
+                "Remove-ItemProperty.*HKLM:"
+            ],
+            "AllowedModules": [
+                "Microsoft.PowerShell.*",
+                "PackageManagement",
+                "PowerShellGet",
+                "PSReadLine",
+                "ThreadJob"
+            ],
+            "MaxOutputSize": 10000,
+            "MaxScriptLength": 50000
+        },
+        "Logging": {
+            "LogFile": "mcp-powershell-server.log",
+            "DetailedLogging": false
+        },
+        "Paths": {
+            "AllowedPaths": [
+                "C:\\Scripts\\",
+                "C:\\Tools\\",
+                "C:\\Temp\\"
+            ]
+        }
+    }
+}

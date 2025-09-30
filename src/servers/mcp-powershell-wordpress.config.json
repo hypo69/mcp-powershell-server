@@ -1,9 +1,0 @@
-{
-    "ServerConfig": {
-        "Name": "WordPress CLI MCP Server",
-        "Version": "1.2.0",
-        "Description": "Выполняет команды WP-CLI через MCP протокол",
-        "MaxExecutionTime": 300,
-        "LogLevel": "INFO"
-    }
-}

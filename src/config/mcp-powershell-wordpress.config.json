@@ -1,0 +1,22 @@
+{
+  "ServerConfig": {
+    "Name": "WordPress CLI MCP Server",
+    "Version": "1.2.1",
+    "Description": "Выполняет команды WP-CLI через MCP протокол",
+    "MaxExecutionTime": 300,
+    "LogLevel": "INFO",
+    "Security": {
+      "EnableScriptValidation": false,
+      "MaxOutputSize": 10000
+    },
+    "Logging": {
+      "LogFile": "mcp-wordpress-server.log",
+      "DetailedLogging": false
+    },
+    "WordPress": {
+      "DefaultPath": "",
+      "AutoDetectPath": true,
+      "ForceJsonOutput": true
+    }
+  }
+}

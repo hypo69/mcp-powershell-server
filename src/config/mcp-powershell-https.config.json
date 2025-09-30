@@ -1,0 +1,56 @@
+{
+  "ServerConfig": {
+    "Name": "PowerShell HTTPS Server",
+    "Version": "1.0.0",
+    "Description": "Выполняет PowerShell скрипты через HTTPS MCP протокол",
+    "MaxExecutionTime": 300,
+    "LogLevel": "INFO",
+    "Http": {
+      "Port": 8090,
+      "Host": "localhost",
+      "UseHttps": true,
+      "MaxConcurrentRequests": 10,
+      "EnableCors": true,
+      "AllowedOrigins": [
+        "http://localhost:*",
+        "https://localhost:*"
+      ]
+    },
+    "Security": {
+      "EnableAuthentication": false,
+      "EnableScriptValidation": false,
+      "BlockDangerousCommands": false,
+      "RestrictedCommands": [
+        "Remove-Item.*C:\\\\Windows",
+        "Remove-Item.*C:\\\\Program Files",
+        "Format-Volume",
+        "Stop-Computer",
+        "Restart-Computer",
+        "Remove-Item.*HKLM:",
+        "New-ItemProperty.*HKLM:",
+        "Set-ItemProperty.*HKLM:",
+        "Remove-ItemProperty.*HKLM:"
+      ],
+      "AllowedModules": [
+        "Microsoft.PowerShell.*",
+        "PackageManagement",
+        "PowerShellGet",
+        "PSReadLine",
+        "ThreadJob"
+      ],
+      "MaxOutputSize": 10000,
+      "MaxScriptLength": 50000
+    },
+    "Logging": {
+      "LogFile": "mcp-powershell-https-server.log",
+      "DetailedLogging": false
+    },
+    "Paths": {
+      "AllowedPaths": [
+        "C:\\Scripts\\",
+        "C:\\Tools\\",
+        "C:\\Temp\\"
+      ]
+    }
+  }
+}

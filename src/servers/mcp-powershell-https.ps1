@@ -1,17 +1,15 @@
-## \file mcp-powershell-server/mcp-powershell-http.ps1
-# -*- coding: utf-8 -*-
-#! .pyenv/bin/powershell
+## \file mcp-powershell-server/mcp-powershell-https.ps1
 
 <#
 .SYNOPSIS
-    Улучшенный MCP PowerShell Server (HTTP версия)
+    Улучшенный MCP PowerShell Server (HTTPS версия)
 
 .DESCRIPTION
-    HTTP сервер для выполнения PowerShell скриптов через MCP протокол.
+    HTTPS сервер для выполнения PowerShell скриптов через MCP протокол.
     Версия с улучшенной обработкой ошибок, безопасностью и производительностью.
 
 .PARAMETER Port
-    Порт для HTTP сервера (по умолчанию: 8090)
+    Порт для HTTP/HTTPS сервера (по умолчанию: 8090)
 
 .PARAMETER ServerHost
     Хост для привязки сервера (по умолчанию: localhost)
@@ -20,7 +18,7 @@
     Путь к файлу конфигурации JSON
 
 .EXAMPLE
-    .\mcp-powershell-http-improved.ps1 -Port 8090 -ServerHost localhost
+    .\mcp-powershell-https.ps1 -Port 8090 -ServerHost localhost
 
 .NOTES
     Version: 1.1.0
@@ -30,30 +28,71 @@
 
 #Requires -Version 7.0
 
-param(
-    [Parameter(Mandatory = $false)]
-    [int]$Port = 8090,
-    
-    [Parameter(Mandatory = $false)]
-    [string]$ServerHost = "localhost",
-    
-    [Parameter(Mandatory = $false)]
-    [string]$ConfigFile = "mcp-powershell-http.config.json""
-)
+$ConfigFileName = '../config/mcp-powershell-https.config.json'
 
-# Глобальные переменные конфигурации
-$script:ServerConfig = @{
-    Port = $Port
-    Host = $ServerHost
-    MaxConcurrentRequests = 10
-    TimeoutSeconds = 300
-    Name = "PowerShell Script Runner"
-    Version = "1.1.0"
-    Description = "HTTP MCP сервер для выполнения PowerShell скриптов"
-    LogLevel = "INFO"
+function Load-ServerConfig {
+    param([Parameter(Mandatory = $true)][string]$Path)
+    
+    $ScriptDir = Split-Path -Parent $PSCommandPath
+    $FullPath = Join-Path -Path $ScriptDir -ChildPath $Path
+    
+    $DefaultConfig = @{
+        Name = 'PowerShell HTTPS Server'
+        Version = '1.0.0'
+        Description = 'Выполняет PowerShell скрипты через HTTPS MCP протокол'
+        MaxExecutionTime = 300
+        LogLevel = 'INFO'
+        Http = @{
+            Port = 8090
+            Host = 'localhost'
+            UseHttps = $true
+            MaxConcurrentRequests = 10
+        }
+    }
+    
+    if (-not (Test-Path $FullPath)) {
+        Write-Error "Файл конфигурации не найден: $FullPath"
+        return $DefaultConfig
+    }
+    
+    try {
+        $ConfigJson = Get-Content -Path $FullPath -Raw | ConvertFrom-Json -ErrorAction Stop
+        
+        if ($ConfigJson.PSObject.Properties.Name -contains 'ServerConfig') {
+            return $ConfigJson.ServerConfig
+        }
+        return $ConfigJson
+    }
+    catch {
+        Write-Error "Ошибка чтения конфигурации: $($_.Exception.Message)"
+        return $DefaultConfig
+    }
 }
 
-# Загрузка конфигурации из файла если указан
+$script:ServerConfigFromFile = Load-ServerConfig -Path $ConfigFileName
+
+param(
+    [Parameter(Mandatory = $false)]
+    [int]$Port = $script:ServerConfigFromFile.Http.Port,
+    
+    [Parameter(Mandatory = $false)]
+    [string]$ServerHost = $script:ServerConfigFromFile.Http.Host,
+    
+    [Parameter(Mandatory = $false)]
+    [string]$ConfigFile = $ConfigFileName
+)
+
+$script:ServerConfig = @{
+    Port = $Port;
+    Host = $ServerHost;
+    MaxConcurrentRequests = 10;
+    TimeoutSeconds = 300;
+    Name = "PowerShell Script Runner";
+    Version = "1.1.0";
+    Description = "HTTP MCP сервер для выполнения PowerShell скриптов";
+    LogLevel = "INFO";
+}
+
 if ($ConfigFile -and (Test-Path $ConfigFile)) {
     try {
         $configData = Get-Content $ConfigFile -Raw | ConvertFrom-Json
@@ -61,14 +100,14 @@ if ($ConfigFile -and (Test-Path $ConfigFile)) {
         if ($configData.Host) { $script:ServerConfig.Host = $configData.Host }
         if ($configData.MaxConcurrentRequests) { $script:ServerConfig.MaxConcurrentRequests = $configData.MaxConcurrentRequests }
         if ($configData.TimeoutSeconds) { $script:ServerConfig.TimeoutSeconds = $configData.TimeoutSeconds }
-        Write-Log "Конфигурация загружена из файла: $ConfigFile" -Level "INFO"
+        # This function is defined later, so we use Write-Host for early logging
+        Write-Host "[$([string](Get-Date -Format 'yyyy-MM-dd HH:mm:ss.fff'))] [INFO] Конфигурация загружена из файла: $ConfigFile"
     }
     catch {
-        Write-Log "Ошибка загрузки конфигурации: $($_.Exception.Message)" -Level "ERROR"
+        Write-Host "[$([string](Get-Date -Format 'yyyy-MM-dd HH:mm:ss.fff'))] [ERROR] Ошибка загрузки конфигурации: $($_.Exception.Message)"
     }
 }
 
-# Список потенциально опасных команд
 $script:RestrictedCommands = @(
     'Remove-Item', 'del', 'rm', 'rmdir',
     'Format-Volume',
@@ -82,16 +121,6 @@ $script:RestrictedCommands = @(
 #region Utility Functions
 
 function Write-Log {
-    <#
-    .SYNOPSIS
-        Записывает сообщение в консоль с цветовой индикацией и временной меткой
-    
-    .PARAMETER Message
-        Текст сообщения
-    
-    .PARAMETER Level
-        Уровень логирования
-    #>
     param(
         [Parameter(Mandatory = $true)]
         [string]$Message,
@@ -116,16 +145,6 @@ function Write-Log {
 }
 
 function Test-MCPRequest {
-    <#
-    .SYNOPSIS
-        Проверяет валидность MCP запроса
-    
-    .PARAMETER Request
-        Хеш-таблица с данными запроса
-    
-    .RETURNS
-        $true если запрос валиден
-    #>
     param(
         [Parameter(Mandatory = $true)]
         [hashtable]$Request
@@ -145,22 +164,6 @@ function Test-MCPRequest {
 }
 
 function New-MCPResponse {
-    <#
-    .SYNOPSIS
-        Создает стандартизированный MCP ответ
-    
-    .PARAMETER Id
-        Идентификатор запроса
-    
-    .PARAMETER Result
-        Данные результата
-    
-    .PARAMETER Error
-        Данные ошибки
-    
-    .RETURNS
-        Хеш-таблица с MCP ответом
-    #>
     param(
         [Parameter(Mandatory = $false)]
         [object]$Id = $null,
@@ -188,45 +191,15 @@ function New-MCPResponse {
 }
 
 function Test-ScriptSafety {
-    <#
-    .SYNOPSIS
-        Проверяет скрипт на наличие потенциально опасных команд
-    
-    .PARAMETER Script
-        PowerShell скрипт для анализа
-    
-    .RETURNS
-        $true если скрипт безопасен
-    #>
     param(
         [Parameter(Mandatory = $true)]
         [string]$Script
     )
     
-    # Функция проверки безопасности отключена в демо версии
     return $true
 }
 
 function Invoke-PowerShellScript {
-    <#
-    .SYNOPSIS
-        Выполняет PowerShell скрипт в изолированном окружении
-    
-    .PARAMETER Script
-        PowerShell код для выполнения
-    
-    .PARAMETER Parameters
-        Параметры для передачи в скрипт
-    
-    .PARAMETER TimeoutSeconds
-        Таймаут выполнения в секундах
-    
-    .PARAMETER WorkingDirectory
-        Рабочая директория для выполнения
-    
-    .RETURNS
-        Хеш-таблица с результатами выполнения
-    #>
     param(
         [Parameter(Mandatory = $true)]
         [string]$Script,
@@ -249,7 +222,6 @@ function Invoke-PowerShellScript {
     $asyncResult = $null
     
     try {
-        # Проверка безопасности
         if (-not (Test-ScriptSafety -Script $Script)) {
             return @{
                 success = $false
@@ -260,23 +232,18 @@ function Invoke-PowerShellScript {
             }
         }
         
-        # Создание изолированного PowerShell процесса
         $powerShell = [powershell]::Create()
         
-        # Установка рабочей директории
         if ($WorkingDirectory -ne $PWD.Path -and (Test-Path $WorkingDirectory)) {
             $powerShell.AddScript("Set-Location -Path '$WorkingDirectory' -ErrorAction SilentlyContinue") | Out-Null
         }
         
-        # Добавление основного скрипта
         $powerShell.AddScript($Script) | Out-Null
         
-        # Добавление параметров
         foreach ($param in $Parameters.GetEnumerator()) {
             $powerShell.AddParameter($param.Key, $param.Value) | Out-Null
         }
         
-        # Выполнение с таймаутом
         $startTime = Get-Date
         $asyncResult = $powerShell.BeginInvoke()
         
@@ -288,14 +255,12 @@ function Invoke-PowerShellScript {
             $errors = $powerShell.Streams.Error
             $warnings = $powerShell.Streams.Warning
             
-            # Формирование вывода с ограничением размера
             $outputText = if ($result) {
                 ($result | Out-String -Width 120).Trim()
             } else {
                 ""
             }
             
-            # Ограничение размера вывода
             if ($outputText.Length -gt 10000) {
                 $outputText = $outputText.Substring(0, 10000) + "`n... [вывод обрезан]"
             }
@@ -313,7 +278,6 @@ function Invoke-PowerShellScript {
             
             return $output
         } else {
-            # Таймаут
             Write-Log "[$executionId] Таймаут выполнения ($TimeoutSeconds сек)" -Level "ERROR"
             $powerShell.Stop()
             
@@ -339,7 +303,6 @@ function Invoke-PowerShellScript {
         }
     }
     finally {
-        # Очистка ресурсов
         if ($asyncResult) {
             try { $asyncResult.AsyncWaitHandle.Close() } catch { }
         }
@@ -354,22 +317,6 @@ function Invoke-PowerShellScript {
 #region MCP Protocol Methods
 
 function Invoke-MCPMethod {
-    <#
-    .SYNOPSIS
-        Обрабатывает MCP методы согласно протоколу
-    
-    .PARAMETER Method
-        Имя вызываемого метода
-    
-    .PARAMETER Params
-        Параметры метода
-    
-    .PARAMETER Id
-        Идентификатор запроса
-    
-    .RETURNS
-        MCP ответ в виде хеш-таблицы
-    #>
     param(
         [Parameter(Mandatory = $true)]
         [string]$Method,
@@ -462,9 +409,8 @@ function Invoke-MCPMethod {
                         }
                     }
                     
-                    # Извлечение параметров
-                    $script = $arguments.script
-                    $parameters = if ($arguments.ContainsKey("parameters")) { $arguments.parameters } else { @{} }
+                    $scriptToRun = $arguments.script
+                    $scriptParameters = if ($arguments.ContainsKey("parameters")) { $arguments.parameters } else { @{} }
                     $workingDirectory = if ($arguments.ContainsKey("workingDirectory")) { 
                         $arguments.workingDirectory 
                     } else { 
@@ -476,10 +422,8 @@ function Invoke-MCPMethod {
                         $script:ServerConfig.TimeoutSeconds 
                     }
                     
-                    # Выполнение скрипта
-                    $result = Invoke-PowerShellScript -Script $script -Parameters $parameters -WorkingDirectory $workingDirectory -TimeoutSeconds $timeoutSeconds
+                    $result = Invoke-PowerShellScript -Script $scriptToRun -Parameters $scriptParameters -WorkingDirectory $workingDirectory -TimeoutSeconds $timeoutSeconds
                     
-                    # Формирование контента ответа
                     $content = @()
                     
                     if ($result.output) {
@@ -548,13 +492,6 @@ function Invoke-MCPMethod {
 #region HTTP Server
 
 function Invoke-RequestHandler {
-    <#
-    .SYNOPSIS
-        Обрабатывает HTTP запрос к MCP серверу
-    
-    .PARAMETER Context
-        Контекст HTTP запроса
-    #>
     param(
         [Parameter(Mandatory = $true)]
         [System.Net.HttpListenerContext]$Context
@@ -567,12 +504,10 @@ function Invoke-RequestHandler {
     try {
         Write-Log "HTTP запрос от $clientEndpoint : $($request.HttpMethod) $($request.Url.AbsolutePath)" -Level "INFO"
         
-        # Установка CORS заголовков
         $response.Headers.Add("Access-Control-Allow-Origin", "*")
         $response.Headers.Add("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
         $response.Headers.Add("Access-Control-Allow-Headers", "Content-Type")
         
-        # Обработка OPTIONS запроса (CORS preflight)
         if ($request.HttpMethod -eq "OPTIONS") {
             $response.StatusCode = 200
             $response.Close()
@@ -580,7 +515,6 @@ function Invoke-RequestHandler {
             return
         }
         
-        # Поддержка только POST запросов для MCP
         if ($request.HttpMethod -ne "POST") {
             $response.StatusCode = 405
             $errorResponse = @{
@@ -599,7 +533,6 @@ function Invoke-RequestHandler {
             return
         }
         
-        # Чтение тела запроса
         $reader = New-Object System.IO.StreamReader($request.InputStream, [System.Text.Encoding]::UTF8)
         $requestBody = $reader.ReadToEnd()
         $reader.Close()
@@ -624,7 +557,6 @@ function Invoke-RequestHandler {
         
         Write-Log "Получено тело запроса (длина: $($requestBody.Length) символов)" -Level "DEBUG"
         
-        # Парсинг JSON
         try {
             $mcpRequest = $requestBody | ConvertFrom-Json -AsHashtable -ErrorAction Stop
         }
@@ -646,7 +578,6 @@ function Invoke-RequestHandler {
             return
         }
         
-        # Валидация MCP запроса
         if (-not (Test-MCPRequest -Request $mcpRequest)) {
             $response.StatusCode = 400
             $errorResponse = @{
@@ -665,10 +596,8 @@ function Invoke-RequestHandler {
             return
         }
         
-        # Обработка MCP метода
         $mcpResponse = Invoke-MCPMethod -Method $mcpRequest.method -Params $mcpRequest.params -Id $mcpRequest.id
         
-        # Отправка успешного ответа
         $response.StatusCode = 200
         $response.ContentType = "application/json; charset=utf-8"
         
@@ -715,13 +644,6 @@ function Invoke-RequestHandler {
 }
 
 function Start-MCPServer {
-    <#
-    .SYNOPSIS
-        Запускает HTTP MCP сервер
-    
-    .PARAMETER Config
-        Конфигурация сервера
-    #>
     param(
         [Parameter(Mandatory = $false)]
         [hashtable]$Config = $script:ServerConfig
@@ -730,7 +652,6 @@ function Start-MCPServer {
     $listener = $null
     
     try {
-        # Создание HTTP listener
         $listener = New-Object System.Net.HttpListener
         $url = "http://$($Config.Host):$($Config.Port)/"
         $listener.Prefixes.Add($url)
@@ -740,21 +661,17 @@ function Start-MCPServer {
         Write-Log "Максимальное время выполнения: $($Config.TimeoutSeconds) сек" -Level "INFO"
         Write-Log "Максимальные concurrent запросы: $($Config.MaxConcurrentRequests)" -Level "INFO"
         
-        # Запуск listener
         $listener.Start()
         Write-Log "HTTP сервер запущен и ожидает подключения..." -Level "INFO"
         
-        # Основной цикл обработки запросов
         $requestCount = 0
         while ($listener.IsListening) {
             try {
-                # Ожидание входящего запроса
                 $context = $listener.GetContext()
                 $requestCount++
                 
                 Write-Log "Запрос #$requestCount от $($context.Request.RemoteEndPoint)" -Level "INFO"
                 
-                # Обработка запроса
                 Invoke-RequestHandler -Context $context
                 
             }
@@ -791,12 +708,10 @@ function Start-MCPServer {
 
 #region Signal Handlers
 
-# Обработчик завершения работы
 $null = Register-EngineEvent -SourceIdentifier PowerShell.Exiting -Action {
     Write-Log "Получен сигнал завершения PowerShell" -Level "INFO"
 }
 
-# Обработчик Ctrl+C
 try {
     [Console]::TreatControlCAsInput = $false
     if ([Console].GetMethod("add_CancelKeyPress")) {
@@ -821,7 +736,6 @@ try {
     Write-Log "PowerShell версия: $($PSVersionTable.PSVersion)" -Level "INFO"
     Write-Log "Конфигурация: Host=$($script:ServerConfig.Host), Port=$($script:ServerConfig.Port)" -Level "INFO"
     
-    # Проверка доступности порта
     try {
         $ipAddress = if ($script:ServerConfig.Host -eq "localhost") { 
             [System.Net.IPAddress]::Loopback 
@@ -839,7 +753,6 @@ try {
         exit 1
     }
     
-    # Запуск сервера
     Start-MCPServer -Config $script:ServerConfig
 }
 catch {
