@@ -1,6 +1,4 @@
 ## \file mcp-powershell-server/mcp-powershell-wpcli.ps1
-# -*- coding: utf-8 -*-
-#! .pyenv/bin/powershell
 
 <#
 .SYNOPSIS
@@ -11,14 +9,20 @@
     с использованием стандартных потоков ввода-вывода.
 
 .NOTES
-    Version: 1.2.1
+    Version: 1.2.3
     Author: hypo69
     Protocol: MCP 2024-11-05
 #>
 
 #Requires -Version 7.0
 
-# Настройка кодировки для корректной работы с UTF-8
+$ErrorActionPreference = 'SilentlyContinue'
+$WarningPreference = 'SilentlyContinue'
+$VerbosePreference = 'SilentlyContinue'
+$DebugPreference = 'SilentlyContinue'
+$InformationPreference = 'SilentlyContinue'
+$ProgressPreference = 'SilentlyContinue'
+
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 [Console]::InputEncoding = [System.Text.Encoding]::UTF8
 
@@ -37,30 +41,54 @@ function Load-ServerConfig {
     
     $DefaultConfig = @{
         Name = 'WordPress CLI MCP Server'
-        Version = '1.2.1'
+        Version = '1.2.3'
         Description = 'Выполняет команды WP-CLI через MCP протокол'
         MaxExecutionTime = 300
         LogLevel = 'INFO'
     }
     
     if (-not (Test-Path $FullPath)) {
-        Write-Error "Файл конфигурации не найден: $FullPath. Используется конфигурация по умолчанию."
         return $DefaultConfig
     }
     
     try {
-        $ConfigJson = Get-Content -Path $FullPath -Raw | ConvertFrom-Json -ErrorAction Stop
+        $ConfigJson = Get-Content -Path $FullPath -Raw -ErrorAction Stop | ConvertFrom-Json -ErrorAction Stop
         
         if ($ConfigJson.PSObject.Properties.Name -contains 'ServerConfig') {
-            return $ConfigJson.ServerConfig
+            $LoadedConfig = $ConfigJson.ServerConfig
         }
         else {
-            Write-Error "В файле конфигурации отсутствует ключ 'ServerConfig'. Используется конфигурация по умолчанию."
             return $DefaultConfig
         }
+        
+        function ConvertTo-Hashtable {
+            param($InputObject)
+            
+            $hash = @{}
+            if ($null -eq $InputObject) { return $hash }
+            
+            $InputObject.PSObject.Properties | ForEach-Object {
+                $value = $_.Value
+                if ($value -is [PSCustomObject]) {
+                    $value = ConvertTo-Hashtable $value
+                }
+                elseif ($value -is [System.Collections.IEnumerable] -and $value -isnot [string]) {
+                    $value = @($value | ForEach-Object {
+                        if ($_ -is [PSCustomObject]) {
+                            ConvertTo-Hashtable $_
+                        } else {
+                            $_
+                        }
+                    })
+                }
+                $hash[$_.Name] = $value
+            }
+            return $hash
+        }
+        
+        return ConvertTo-Hashtable -InputObject $LoadedConfig
     }
     catch {
-        Write-Error "Ошибка чтения конфигурации: $($_.Exception.Message). Используется конфигурация по умолчанию."
         return $DefaultConfig
     }
 }
@@ -88,9 +116,7 @@ function Write-Log {
         
         $null = Add-Content -Path $script:LogFile -Value $logMessage -Encoding UTF8 -ErrorAction SilentlyContinue
     }
-    catch {
-        # Игнорирование ошибок логирования
-    }
+    catch { }
 }
 
 function ConvertFrom-JsonToHashtable {
@@ -170,7 +196,8 @@ function Send-MCPResponse {
     try {
         $json = $Response | ConvertTo-Json -Depth 20 -Compress -ErrorAction Stop
         
-        Write-Host $json
+        [Console]::Out.WriteLine($json)
+        [Console]::Out.Flush()
         
         $logJson = if ($json.Length -gt 300) { 
             $json.Substring(0, 300) + '...' 
@@ -193,10 +220,12 @@ function Send-MCPResponse {
         
         try {
             $errorJson = $errorResponse | ConvertTo-Json -Depth 5 -Compress
-            Write-Host $errorJson
+            [Console]::Out.WriteLine($errorJson)
+            [Console]::Out.Flush()
         }
         catch {
-            Write-Host '{"jsonrpc":"2.0","error":{"code":-32603,"message":"Critical serialization error"},"id":null}'
+            [Console]::Out.WriteLine('{"jsonrpc":"2.0","error":{"code":-32603,"message":"Critical serialization error"},"id":null}')
+            [Console]::Out.Flush()
         }
     }
 }
@@ -233,9 +262,9 @@ function Invoke-WPCLI {
             Set-Location -Path $WorkingDirectory -ErrorAction Stop
         }
 
-        $fullCommand = "wp $Arguments --format=json"
+        $fullCommand = "wp $Arguments --format=json 2>&1"
 
-        $commandOutput = & powershell -Command $fullCommand 2>&1
+        $commandOutput = Invoke-Expression $fullCommand
         
         $errors = @($commandOutput | Where-Object { $_ -is [System.Management.Automation.ErrorRecord] -or $_ -match 'Error:' })
         $output = @($commandOutput | Where-Object { $_ -isnot [System.Management.Automation.ErrorRecord] -and $_ -notmatch 'Error:' }) -join "`n"
@@ -245,7 +274,7 @@ function Invoke-WPCLI {
         $result.success = $errors.Count -eq 0
     }
     catch {
-        $result.errors += "Критическая ошибка PowerShell: $($_.Exception.Message)"
+        $result.errors += "Критическая ошибка выполнения: $($_.Exception.Message)"
         $result.success = $false
     }
     finally {
@@ -268,13 +297,21 @@ function Invoke-MCPMethod {
         [string]$Method,
         
         [Parameter(Mandatory = $false)]
-        [hashtable]$Params = @{},
+        $Params = $null,
         
         [Parameter(Mandatory = $false)]
         [object]$Id = $null
     )
     
     Write-Log "Обработка MCP метода: $Method с ID: $Id" -Level 'DEBUG'
+    
+    if ($null -eq $Params) {
+        $Params = @{}
+    }
+    
+    if ($Params -isnot [hashtable]) {
+        $Params = @{}
+    }
     
     switch ($Method) {
         'initialize' {
@@ -432,7 +469,7 @@ function Start-MCPServer {
     
     try {
         while ($true) {
-            $line = [Console]::ReadLine()
+            $line = [Console]::In.ReadLine()
             
             if ($null -eq $line) {
                 Write-Log 'Получен EOF, завершение работы сервера' -Level 'INFO'
@@ -511,14 +548,12 @@ try {
     if (Test-Path $script:LogFile) {
         try {
             Remove-Item $script:LogFile -Force -ErrorAction SilentlyContinue
-        } catch {
-            # Игнорирование ошибок удаления лога
-        }
+        } catch { }
     }
     
     $logDir = Split-Path $script:LogFile -Parent
     if (-not (Test-Path $logDir)) {
-        New-Item -Path $logDir -ItemType Directory -Force | Out-Null
+        New-Item -Path $logDir -ItemType Directory -Force -ErrorAction SilentlyContinue | Out-Null
     }
     
     Write-Log "Инициализация MCP WordPress CLI Server v$($script:ServerConfig.Version)" -Level 'INFO'
@@ -530,21 +565,6 @@ try {
 catch {
     $errorMessage = "КРИТИЧЕСКАЯ ОШИБКА: $($_.Exception.Message)"
     Write-Log $errorMessage -Level 'ERROR'
-    
-    try {
-        $fatalError = @{
-            jsonrpc = '2.0'
-            error = @{
-                code = -32603
-                message = $errorMessage
-            }
-            id = $null
-        } | ConvertTo-Json -Compress
-        Write-Host $fatalError
-    } catch {
-        # Завершение при критической ошибке
-    }
-    
     exit 1
 }
 

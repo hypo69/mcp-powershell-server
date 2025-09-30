@@ -2,19 +2,26 @@
 
 <#
 .SYNOPSIS
-    Улучшенный MCP PowerShell Server (STDIO версия)
+    MCP PowerShell Server (STDIO версия)
 
 .DESCRIPTION
     Сервер MCP для выполнения PowerShell скриптов через протокол JSON-RPC 
     с использованием стандартных потоков ввода-вывода.
 
 .NOTES
-    Version: 1.1.1
+    Version: 1.1.3
     Author: MCP PowerShell Server Team
     Protocol: MCP 2024-11-05
 #>
 
 #Requires -Version 7.0
+
+$ErrorActionPreference = 'SilentlyContinue'
+$WarningPreference = 'SilentlyContinue'
+$VerbosePreference = 'SilentlyContinue'
+$DebugPreference = 'SilentlyContinue'
+$InformationPreference = 'SilentlyContinue'
+$ProgressPreference = 'SilentlyContinue'
 
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 [Console]::InputEncoding = [System.Text.Encoding]::UTF8
@@ -34,7 +41,7 @@ function Load-ServerConfig {
     
     $DefaultConfig = @{
         Name = 'PowerShell Script Runner'
-        Version = '1.1.1'
+        Version = '1.1.3'
         Description = 'Выполняет PowerShell скрипты через MCP протокол'
         MaxExecutionTime = 300
         LogLevel = 'INFO'
@@ -51,12 +58,11 @@ function Load-ServerConfig {
     }
     
     if (-not (Test-Path $FullPath)) {
-        Write-Error "Файл конфигурации не найден: $FullPath. Используется конфигурация по умолчанию."
         return $DefaultConfig
     }
     
     try {
-        $ConfigJson = Get-Content -Path $FullPath -Raw | ConvertFrom-Json -ErrorAction Stop
+        $ConfigJson = Get-Content -Path $FullPath -Raw -ErrorAction Stop | ConvertFrom-Json -ErrorAction Stop
         
         if ($ConfigJson.PSObject.Properties.Name -contains 'ServerConfig') {
             $LoadedConfig = $ConfigJson.ServerConfig
@@ -97,12 +103,10 @@ function Load-ServerConfig {
             }
         }
         
-        Write-Error "Конфигурация загружена из: $FullPath"
         return $ConfigHash
         
     }
     catch {
-        Write-Error "Ошибка чтения конфигурации: $($_.Exception.Message). Используется конфигурация по умолчанию."
         return $DefaultConfig
     }
 }
@@ -382,13 +386,21 @@ function Invoke-MCPMethod {
         [string]$Method,
         
         [Parameter(Mandatory = $false)]
-        [hashtable]$Params = @{},
+        $Params = $null,
         
         [Parameter(Mandatory = $false)]
         [object]$Id = $null
     )
     
     Write-Log "Обработка MCP метода: $Method с ID: $Id" -Level 'DEBUG'
+    
+    if ($null -eq $Params) {
+        $Params = @{}
+    }
+    
+    if ($Params -isnot [hashtable]) {
+        $Params = @{}
+    }
     
     switch ($Method) {
         'initialize' {
@@ -469,7 +481,7 @@ function Invoke-MCPMethod {
                         }
                     }
                     
-                    $script = $arguments.script
+                    $scriptContent = $arguments.script
                     $parameters = if ($arguments.ContainsKey('parameters')) { $arguments.parameters } else { @{} }
                     $workingDirectory = if ($arguments.ContainsKey('workingDirectory')) { 
                         $arguments.workingDirectory 
@@ -482,7 +494,7 @@ function Invoke-MCPMethod {
                         $script:ServerConfig.MaxExecutionTime
                     }
                     
-                    $result = Invoke-PowerShellScript -Script $script -Parameters $parameters -WorkingDirectory $workingDirectory -TimeoutSeconds $timeoutSeconds
+                    $result = Invoke-PowerShellScript -Script $scriptContent -Parameters $parameters -WorkingDirectory $workingDirectory -TimeoutSeconds $timeoutSeconds
                     
                     $content = @()
                     
@@ -556,7 +568,8 @@ function Send-MCPResponse {
     try {
         $json = $Response | ConvertTo-Json -Depth 20 -Compress -ErrorAction Stop
         
-        Write-Host $json
+        [Console]::Out.WriteLine($json)
+        [Console]::Out.Flush()
         
         $logJson = if ($json.Length -gt 300) { 
             $json.Substring(0, 300) + '...' 
@@ -579,10 +592,12 @@ function Send-MCPResponse {
         
         try {
             $errorJson = $errorResponse | ConvertTo-Json -Depth 5 -Compress
-            Write-Host $errorJson
+            [Console]::Out.WriteLine($errorJson)
+            [Console]::Out.Flush()
         }
         catch {
-            Write-Host '{"jsonrpc":"2.0","error":{"code":-32603,"message":"Critical serialization error"},"id":null}'
+            [Console]::Out.WriteLine('{"jsonrpc":"2.0","error":{"code":-32603,"message":"Critical serialization error"},"id":null}')
+            [Console]::Out.Flush()
         }
     }
 }
@@ -602,7 +617,7 @@ function Start-MCPServer {
     
     try {
         while ($true) {
-            $line = [Console]::ReadLine()
+            $line = [Console]::In.ReadLine()
             
             if ($null -eq $line) {
                 Write-Log 'Получен EOF, завершение работы сервера' -Level 'INFO'
@@ -662,20 +677,18 @@ function Start-MCPServer {
 
 #endregion
 
-#region Main Entry Point - ИСПРАВЛЕННЫЙ И ДОПОЛНЕННЫЙ БЛОК
+#region Main Entry Point
 
 try {
     if (Test-Path $script:LogFile) {
         try {
             Remove-Item $script:LogFile -Force -ErrorAction SilentlyContinue
-        } catch {
-            # Игнорирование ошибок удаления лога
-        }
+        } catch { }
     }
     
     $logDir = Split-Path $script:LogFile -Parent
     if (-not (Test-Path $logDir)) {
-        New-Item -Path $logDir -ItemType Directory -Force | Out-Null
+        New-Item -Path $logDir -ItemType Directory -Force -ErrorAction SilentlyContinue | Out-Null
     }
 
     Write-Log "Инициализация MCP PowerShell Server v$($script:ServerConfig.Version)" -Level 'INFO'
