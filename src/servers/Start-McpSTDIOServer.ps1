@@ -9,13 +9,14 @@
     с использованием стандартных потоков ввода-вывода.
 
 .NOTES
-    Version: 1.1.3
+    Version: 1.1.4
     Author: MCP PowerShell Server Team
     Protocol: MCP 2024-11-05
 #>
 
 #Requires -Version 7.0
 
+# КРИТИЧЕСКИ ВАЖНО: Подавляем ВСЕ выводы в stdout до инициализации сервера
 $ErrorActionPreference = 'SilentlyContinue'
 $WarningPreference = 'SilentlyContinue'
 $VerbosePreference = 'SilentlyContinue'
@@ -23,12 +24,24 @@ $DebugPreference = 'SilentlyContinue'
 $InformationPreference = 'SilentlyContinue'
 $ProgressPreference = 'SilentlyContinue'
 
+# Отключаем вывод прогресса и информационных сообщений
+$PSDefaultParameterValues = @{
+    '*:Verbose' = $false
+    '*:Debug' = $false
+    '*:InformationAction' = 'SilentlyContinue'
+    '*:WarningAction' = 'SilentlyContinue'
+    '*:ErrorAction' = 'SilentlyContinue'
+}
+
+# Подавляем баннер PowerShell и любые другие выводы
+$Host.UI.RawUI.BufferSize = New-Object System.Management.Automation.Host.Size(120, 3000)
+
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 [Console]::InputEncoding = [System.Text.Encoding]::UTF8
 
 #region Configuration Loading
 
-$ConfigFileName = '../config/mcp-stdio.config.json'
+$ConfigFileName = '../config/Config-McpSTDIO.json'
 
 function Load-ServerConfig {
     param(
@@ -41,7 +54,7 @@ function Load-ServerConfig {
     
     $DefaultConfig = @{
         Name = 'PowerShell Script Runner'
-        Version = '1.1.3'
+        Version = '1.1.4'
         Description = 'Выполняет PowerShell скрипты через MCP протокол'
         MaxExecutionTime = 300
         LogLevel = 'INFO'
@@ -300,6 +313,16 @@ function Invoke-PowerShellScript {
         }
         
         $powerShell = [powershell]::Create()
+        
+        # Подавляем вывод в дочернем PowerShell
+        $powerShell.AddScript(@'
+$ErrorActionPreference = 'Continue'
+$WarningPreference = 'Continue'
+$VerbosePreference = 'SilentlyContinue'
+$DebugPreference = 'SilentlyContinue'
+$InformationPreference = 'Continue'
+$ProgressPreference = 'SilentlyContinue'
+'@) | Out-Null
         
         if ($WorkingDirectory -ne $PWD.Path -and (Test-Path $WorkingDirectory)) {
             $powerShell.AddScript("Set-Location -Path '$WorkingDirectory' -ErrorAction SilentlyContinue") | Out-Null
@@ -680,6 +703,7 @@ function Start-MCPServer {
 #region Main Entry Point
 
 try {
+    # Инициализация логов
     if (Test-Path $script:LogFile) {
         try {
             Remove-Item $script:LogFile -Force -ErrorAction SilentlyContinue
@@ -694,6 +718,7 @@ try {
     Write-Log "Инициализация MCP PowerShell Server v$($script:ServerConfig.Version)" -Level 'INFO'
     Write-Log "PowerShell версия: $($PSVersionTable.PSVersion)" -Level 'INFO'
     
+    # Запускаем сервер
     Start-MCPServer
 }
 catch {

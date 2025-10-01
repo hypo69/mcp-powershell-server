@@ -1,18 +1,11 @@
-## \file launcher-mcp-gemini.ps1
+## \file launcher.ps1
 
 <#
 .SYNOPSIS
-    Launcher для MCP PowerShell серверов с поддержкой Gemini CLI
+    Launcher для MCP PowerShell серверов
     
 .DESCRIPTION
-    Launcher автоматически запускает все MCP серверы в фоновых процессах
-    и настраивает интеграцию с gemini-cli.
-    
-.PARAMETER ApiKey
-    Gemini API ключ для настройки CLI
-    
-.PARAMETER ServersOnly
-    Запустить только серверы без настройки gemini-cli
+    Launcher автоматически запускает все MCP серверы в фоновых процессах.
     
 .PARAMETER StopServers
     Остановить все запущенные MCP серверы
@@ -21,30 +14,22 @@
     Путь к директории с конфигурациями (по умолчанию: src/config)
     
 .EXAMPLE
-    .\launcher-mcp-gemini.ps1 -ApiKey "your-api-key"
+    .\launcher.ps1
     
 .EXAMPLE
-    .\launcher-mcp-gemini.ps1 -ServersOnly
-    
-.EXAMPLE
-    .\launcher-mcp-gemini.ps1 -StopServers
+    .\launcher.ps1 -StopServers
 
 .NOTES
+    Version: 1.0.1
     Author: hypo69
     License: MIT (https://opensource.org/licenses/MIT)
     Copyright: @hypo69 - 2025
 #>
-
 #Requires -Version 7.0
+
 
 [CmdletBinding()]
 param(
-    [Parameter(Mandatory = $false)]
-    [string]$ApiKey,
-    
-    [Parameter(Mandatory = $false)]
-    [switch]$ServersOnly,
-    
     [Parameter(Mandatory = $false)]
     [switch]$StopServers,
     
@@ -57,9 +42,12 @@ param(
 
 #region Global Variables
 
-$script:LauncherVersion = '1.0.0'
+$script:LauncherVersion = '1.0.1'
 $script:ServerProcesses = @{}
 $script:LogFile = Join-Path $env:TEMP 'mcp-launcher.log'
+
+# Определяем корень проекта — папку, где лежит этот скрипт
+$script:ProjectRoot = $PSScriptRoot
 
 #endregion
 
@@ -83,19 +71,19 @@ function Write-Log {
     $color = switch ($Level) {
         'SUCCESS' { 'Green' }
         'WARNING' { 'Yellow' }
-        'ERROR' { 'Red' }
-        'INFO' { 'Cyan' }
-        'DEBUG' { 'Gray' }
-        default { 'White' }
+        'ERROR'   { 'Red' }
+        'INFO'    { 'Cyan' }
+        'DEBUG'   { 'Gray' }
+        default   { 'White' }
     }
     
     $prefix = switch ($Level) {
         'SUCCESS' { '[✓]' }
         'WARNING' { '[!]' }
-        'ERROR' { '[✗]' }
-        'INFO' { '[i]' }
-        'DEBUG' { '[d]' }
-        default { '[-]' }
+        'ERROR'   { '[✗]' }
+        'INFO'    { '[i]' }
+        'DEBUG'   { '[d]' }
+        default   { '[-]' }
     }
     
     Write-Host "$prefix $Message" -ForegroundColor $color
@@ -107,28 +95,22 @@ function Show-Help {
 MCP PowerShell Server Launcher v$script:LauncherVersion
 
 ОПИСАНИЕ:
-    Автоматический запуск всех MCP PowerShell серверов и настройка
-    интеграции с gemini-cli.
+    Автоматический запуск всех MCP PowerShell серверов.
 
 ИСПОЛЬЗОВАНИЕ:
-    .\launcher-mcp-gemini.ps1 [параметры]
+    .\launcher.ps1 [параметры]
 
 ПАРАМЕТРЫ:
-    -ApiKey <ключ>          Gemini API ключ для настройки gemini-cli
-    -ServersOnly            Запустить только серверы без настройки gemini-cli
     -StopServers            Остановить все запущенные MCP серверы
     -ConfigPath <путь>      Путь к директории с конфигурациями
     -Help                   Показать эту справку
 
 ПРИМЕРЫ:
-    # Запуск всех серверов с настройкой gemini-cli
-    .\launcher-mcp-gemini.ps1 -ApiKey "your-gemini-api-key"
-    
-    # Запуск только серверов
-    .\launcher-mcp-gemini.ps1 -ServersOnly
+    # Запуск всех серверов
+    .\launcher.ps1
     
     # Остановка всех серверов
-    .\launcher-mcp-gemini.ps1 -StopServers
+    .\launcher.ps1 -StopServers
 
 ЗАПУСКАЕМЫЕ СЕРВЕРЫ:
     - powershell-stdio    : STDIO сервер для выполнения PowerShell скриптов
@@ -147,20 +129,29 @@ MCP PowerShell Server Launcher v$script:LauncherVersion
 }
 
 function Find-ServerScript {
-    param([string]$ServerName)
-    
-    $possiblePaths = @(
-        "src\servers\$ServerName",
-        "servers\$ServerName",
-        $ServerName
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$ServerName
     )
-    
-    foreach ($path in $possiblePaths) {
-        if (Test-Path $path) {
-            return (Resolve-Path $path).Path
+
+    $base = $script:ProjectRoot
+
+    # Явно строим каждый путь через последовательные Join-Path
+    $path1 = Join-Path -Path $base -ChildPath 'src'
+    $path1 = Join-Path -Path $path1 -ChildPath 'servers'
+    $path1 = Join-Path -Path $path1 -ChildPath $ServerName
+
+    $path2 = Join-Path -Path $base -ChildPath 'servers'
+    $path2 = Join-Path -Path $path2 -ChildPath $ServerName
+
+    $path3 = Join-Path -Path $base -ChildPath $ServerName
+
+    foreach ($path in @($path1, $path2, $path3)) {
+        if (Test-Path -LiteralPath $path) {
+            return (Resolve-Path -LiteralPath $path).Path
         }
     }
-    
+
     return $null
 }
 
@@ -199,13 +190,15 @@ function Start-MCPServer {
     try {
         $startInfo = New-Object System.Diagnostics.ProcessStartInfo
         $startInfo.FileName = 'pwsh'
-        $startInfo.Arguments = "-NoProfile -ExecutionPolicy Bypass -File `"$ScriptPath`""
+        $startInfo.Arguments = "-NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File `"$ScriptPath`""
         $startInfo.UseShellExecute = $false
         $startInfo.RedirectStandardOutput = $true
         $startInfo.RedirectStandardError = $true
         $startInfo.RedirectStandardInput = $true
         $startInfo.CreateNoWindow = $true
-        $startInfo.WorkingDirectory = (Get-Location).Path
+        
+        # 🔑 Ключевое изменение: рабочая директория — корень проекта
+        $startInfo.WorkingDirectory = $script:ProjectRoot
         
         foreach ($key in $Environment.Keys) {
             $startInfo.EnvironmentVariables[$key] = $Environment[$key]
@@ -260,40 +253,6 @@ function Stop-MCPServers {
     Write-Log "Остановлено серверов: $stoppedCount" -Level 'INFO'
 }
 
-function Setup-GeminiConfig {
-    param([hashtable]$Servers)
-    
-    Write-Log 'Настройка конфигурации MCP для gemini-cli...' -Level 'INFO'
-    
-    $configDir = Join-Path $env:USERPROFILE '.config\gemini'
-    if (-not (Test-Path $configDir)) {
-        New-Item -Path $configDir -ItemType Directory -Force | Out-Null
-    }
-    
-    $mcpServers = @{}
-    
-    foreach ($serverName in $Servers.Keys) {
-        $serverPath = $Servers[$serverName]
-        $mcpServers[$serverName] = @{
-            command = 'pwsh'
-            args = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $serverPath)
-            env = @{
-                POWERSHELL_EXECUTION_POLICY = 'RemoteSigned'
-            }
-        }
-    }
-    
-    $mcpConfig = @{
-        mcpServers = $mcpServers
-    } | ConvertTo-Json -Depth 10
-    
-    $configFile = Join-Path $configDir 'mcp_servers.json'
-    $mcpConfig | Set-Content -Path $configFile -Encoding UTF8
-    
-    Write-Log "Конфигурация сохранена: $configFile" -Level 'SUCCESS'
-    return $configFile
-}
-
 function Show-ServerStatus {
     Write-Host ''
     Write-Host '=== СТАТУС MCP СЕРВЕРОВ ===' -ForegroundColor Cyan
@@ -301,7 +260,9 @@ function Show-ServerStatus {
     
     $runningCount = 0
     
-    foreach ($serverName in $script:ServerProcesses.Keys) {
+    $serverNames = $script:ServerProcesses.Keys | Sort-Object
+    
+    foreach ($serverName in $serverNames) {
         $process = $script:ServerProcesses[$serverName]
         
         if ($process -and -not $process.HasExited) {
@@ -330,17 +291,17 @@ function Start-AllServers {
     
     $servers = @{
         'powershell-stdio' = @{
-            Script = 'mcp-stdio.ps1'
+            Script = 'Start-McpStdioServer.ps1'
             Description = 'STDIO сервер для выполнения PowerShell скриптов'
         }
-        # 'powershell-https' = @{
-        #     Script = 'mcp-https.ps1'
-        #     Description = 'HTTPS сервер для REST API'
-        # }
-        # 'wordpress-cli' = @{
-        #     Script = 'mcp-wpcli.ps1'
-        #     Description = 'WordPress CLI сервер'
-        # }
+        'powershell-https' = @{
+            Script = 'Start-McpHTTPSServer.ps1'
+            Description = 'HTTPS сервер для REST API'
+        }
+        'wordpress-cli' = @{
+            Script = 'Start-McpWPCLIServer.ps1'
+            Description = 'WordPress CLI сервер'
+        }
     }
     
     $foundServers = @{}
@@ -396,7 +357,7 @@ function Start-AllServers {
     
     Show-ServerStatus
     
-    return $foundServers
+    return $true
 }
 
 #endregion
@@ -414,37 +375,21 @@ try {
         exit 0
     }
     
-    $foundServers = Start-AllServers
-    
-    if (-not $foundServers) {
+    if (-not (Start-AllServers)) {
         exit 1
     }
     
-    if (-not $ServersOnly) {
-        if ($ApiKey) {
-            $env:GEMINI_API_KEY = $ApiKey
-            Write-Log 'Gemini API ключ установлен' -Level 'SUCCESS'
-            
-            $configFile = Setup-GeminiConfig -Servers $foundServers
-            
-            Write-Host '=== ГОТОВО К РАБОТЕ ===' -ForegroundColor Green
-            Write-Host ''
-            Write-Host 'Использование с gemini-cli:' -ForegroundColor Yellow
-            Write-Host "  gemini --mcp-config `"$configFile`" -m gemini-2.5-pro -p `"your prompt`"" -ForegroundColor Gray
-            Write-Host ''
-            Write-Host 'Интерактивный режим:' -ForegroundColor Yellow
-            Write-Host "  gemini --mcp-config `"$configFile`" -i" -ForegroundColor Gray
-            Write-Host ''
-        } else {
-            Write-Log 'Серверы запущены. Для настройки gemini-cli укажите параметр -ApiKey' -Level 'WARNING'
-        }
-    }
+    Write-Host '=== СЕРВЕРЫ УСПЕШНО ЗАПУЩЕНЫ ===' -ForegroundColor Green
+    Write-Host ''
     
     Write-Host 'Для остановки всех серверов используйте:' -ForegroundColor Yellow
-    Write-Host '  .\launcher-mcp-gemini.ps1 -StopServers' -ForegroundColor Gray
+    Write-Host '  .\launcher.ps1 -StopServers' -ForegroundColor Gray
     Write-Host ''
     Write-Host 'Для просмотра логов:' -ForegroundColor Yellow
     Write-Host "  Get-Content `"$script:LogFile`" -Tail 50 -Wait" -ForegroundColor Gray
+    Write-Host ''
+    Write-Host 'Логи сервера STDIO:' -ForegroundColor Yellow
+    Write-Host "  Get-Content `"$env:TEMP\mcp-server.log`" -Tail 50 -Wait" -ForegroundColor Gray
     Write-Host ''
     
     Write-Log 'Нажмите Ctrl+C для завершения launcher (серверы продолжат работу в фоне)' -Level 'INFO'

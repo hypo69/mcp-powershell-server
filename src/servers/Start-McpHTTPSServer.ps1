@@ -28,7 +28,7 @@
 
 #Requires -Version 7.0
 
-$ConfigFileName = '../config/mcp-https.config.json'
+$ConfigFileName = '../config/Config-McpHTTPS.json'
 
 function Load-ServerConfig {
     param([Parameter(Mandatory = $true)][string]$Path)

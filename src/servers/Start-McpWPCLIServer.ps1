@@ -28,7 +28,7 @@ $ProgressPreference = 'SilentlyContinue'
 
 #region Global Configuration
 
-$ConfigFileName = '../config/mcp-powershell-wordpress.config.json'
+$ConfigFileName = '../config/Config-McpWPCLI.json'
 
 function Load-ServerConfig {
     param(
@@ -94,7 +94,7 @@ function Load-ServerConfig {
 }
 
 $script:ServerConfig = Load-ServerConfig -Path $ConfigFileName
-$script:LogFile = Join-Path $env:TEMP 'mcp-wordpress-server.log'
+$script:LogFile = Join-Path $env:TEMP 'mcp-wpcli-server.log'
 
 #endregion
 
