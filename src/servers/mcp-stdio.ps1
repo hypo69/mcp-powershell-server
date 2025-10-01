@@ -1,4 +1,4 @@
-## \file mcp-powershell-server/mcp-powershell-stdio.ps1
+## \file mcp-server/mcp-stdio.ps1
 
 <#
 .SYNOPSIS
@@ -28,7 +28,7 @@ $ProgressPreference = 'SilentlyContinue'
 
 #region Configuration Loading
 
-$ConfigFileName = '../config/mcp-powershell-stdio.config.json'
+$ConfigFileName = '../config/mcp-stdio.config.json'
 
 function Load-ServerConfig {
     param(
@@ -52,7 +52,7 @@ function Load-ServerConfig {
             MaxScriptLength = 50000
         }
         Logging = @{
-            LogFile = 'mcp-powershell-server.log'
+            LogFile = 'mcp-server.log'
             DetailedLogging = $false
         }
     }

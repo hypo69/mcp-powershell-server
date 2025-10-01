@@ -1,4 +1,4 @@
-## \file mcp-powershell-server/mcp-powershell-https.ps1
+## \file mcp-server/mcp-https.ps1
 
 <#
 .SYNOPSIS
@@ -18,7 +18,7 @@
     Путь к файлу конфигурации JSON
 
 .EXAMPLE
-    .\mcp-powershell-https.ps1 -Port 8090 -ServerHost localhost
+    .\mcp-https.ps1 -Port 8090 -ServerHost localhost
 
 .NOTES
     Version: 1.1.1
@@ -28,7 +28,7 @@
 
 #Requires -Version 7.0
 
-$ConfigFileName = '../config/mcp-powershell-https.config.json'
+$ConfigFileName = '../config/mcp-https.config.json'
 
 function Load-ServerConfig {
     param([Parameter(Mandatory = $true)][string]$Path)

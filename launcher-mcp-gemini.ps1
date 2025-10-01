@@ -330,17 +330,17 @@ function Start-AllServers {
     
     $servers = @{
         'powershell-stdio' = @{
-            Script = 'mcp-powershell-stdio.ps1'
+            Script = 'mcp-stdio.ps1'
             Description = 'STDIO сервер для выполнения PowerShell скриптов'
         }
-        'powershell-https' = @{
-            Script = 'mcp-powershell-https.ps1'
-            Description = 'HTTPS сервер для REST API'
-        }
-        'wordpress-cli' = @{
-            Script = 'mcp-powershell-wpcli.ps1'
-            Description = 'WordPress CLI сервер'
-        }
+        # 'powershell-https' = @{
+        #     Script = 'mcp-https.ps1'
+        #     Description = 'HTTPS сервер для REST API'
+        # }
+        # 'wordpress-cli' = @{
+        #     Script = 'mcp-wpcli.ps1'
+        #     Description = 'WordPress CLI сервер'
+        # }
     }
     
     $foundServers = @{}
